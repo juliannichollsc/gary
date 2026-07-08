@@ -1,0 +1,24 @@
+{
+  "_comment": "TEMPLATE (.example) — CANDIDATE-AGNOSTIC scanner filter. The LM agent GENERATES config/easyapply-filter.json FROM this template at session start, DERIVING the values from the role map + application preferences in data/cv/base/gary-context.md (which came from the NotebookLM RAG). Mapping: `titles` <- the `## Familias de roles` labels; `positive` <- the candidate's real `## Skills técnicas` (regex the JD must hit >=1 of); `reject` <- the `**Gap skills — NUNCA reclamar**` list + region/language/YOE gates (operating-rules §1). MODALITY (from `## Preferencias de aplicación` → 'Modalidad aceptada' + 'Ubicación'): set `workType` (LinkedIn f_WT: 1=on-site 2=remote 3=hybrid, comma list) AND `locations` accordingly — REMOTE -> workType '2' + remote regions (LATAM/Worldwide/…); PRESENCIAL-only -> workType '1' + locations = ONLY the candidate's current CITY; HYBRID-only -> workType '3' + the city; if 'todas'/mixed -> combine (e.g. '1,2,3' + regions AND the city). If config/easyapply-filter.json is missing, empty, or still holds {{PLACEHOLDER}}s -> (re)generate it now; else reuse it. engines/linkedin-scan.mjs reads the GENERATED file. RESTRICTIVE: an offer survives ONLY if its JD loaded AND matches >=1 'positive' AND hits NONE of 'reject'. Real candidate data lives ONLY in the generated file (gitignored), NEVER in this .example.",
+  "candidate": "{{CANDIDATE_NAME}}",
+  "titles": ["{{ROLE_TITLE_1}}", "{{ROLE_TITLE_2}}", "{{ROLE_TITLE_3}}"],
+  "workType": "2",
+  "_workType_note": "f_WT LinkedIn: 1=on-site(presencial) 2=remote 3=hybrid (comma list ok). DERIVE from 'Modalidad aceptada' in gary-context.md. If PRESENCIAL/HYBRID -> replace `locations` below with ONLY the candidate's current city, e.g. [{ \"loc\": \"{{CITY}}\" }].",
+  "locations": [
+    { "loc": "Latin America" },
+    { "loc": "Worldwide", "geo": "92000000" },
+    { "loc": "United States" },
+    { "loc": "Canada" },
+    { "loc": "European Union" },
+    { "loc": "United Kingdom" }
+  ],
+  "positive": ["{{POSITIVE_STACK_REGEX_1}}", "{{POSITIVE_STACK_REGEX_2}}"],
+  "reject": [
+    { "re": "\\b(junior|jr\\.?|intern|internship|trainee|entry[- ]level|graduate program|working student|becario|practicante)\\b", "why": "junior/entry" },
+    { "re": "{{GAP_SKILL_REGEX}}", "why": "gap skill — 0 YOE, from gary-context.md" },
+    { "re": "must be (authorized|eligible|able) to work in the (u\\.?s\\.?|united states)|u\\.?s\\.? work authorization|(u\\.?s\\.?|american) citizen|green card holder|security clearance|e-?verify|gc only", "why": "US work-auth" },
+    { "re": "(c1|c2)\\s*(level)?\\s*(english|inglés)|(english|inglés)\\s*(level\\s*)?(c1|c2)|native english|fully fluent english", "why": "C1/C2 English (adjust to candidate's CEFR level in gary-context.md)" },
+    { "re": "\\b(1[0-9]|[2-9][0-9])\\+\\s*years\\b", "why": "10+ yrs (explicit)" },
+    { "re": "\\b(at least|minimum of|minimum)\\s*1[0-9]\\s*years\\b", "why": "10+ yrs (minimum)" }
+  ]
+}

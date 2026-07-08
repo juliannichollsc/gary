@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "pencil": {
+      "type": "stdio",
+      "command": "C:\\Users\\Julian\\AppData\\Roaming\\npm\\node_modules\\@pencil.dev\\cli\\dist\\out\\mcp-server-windows-x64.exe",
+      "args": ["--app", "vscode"],
+      "env": {}
+    }
+  }
+}

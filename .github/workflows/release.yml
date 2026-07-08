@@ -1,0 +1,66 @@
+name: Release
+
+# Build the desktop installer and attach it to a GitHub Release.
+# Non-technical users just download the .exe from the Releases page — no clone, no build.
+#
+# Trigger: push a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`), or run manually.
+# Windows only for now; add macos-latest / ubuntu-22.04 to the matrix once the portability pass lands.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write            # needed to create the Release and upload assets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build + publish (Tauri)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'GARY ${{ github.ref_name }}'
+          releaseBody: |
+            ## Download & install
+            Grab the installer for your OS below and double-click.
+            **Windows:** `GARY_x.y.z_x64-setup.exe` (NSIS).
+
+            > First launch may show a Windows SmartScreen notice ("Windows protected your PC")
+            > because the installer isn't code-signed yet — click **More info → Run anyway**.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

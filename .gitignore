@@ -1,0 +1,115 @@
+# ─────────────────────────────────────────────────────────────
+# Dependencies & build output
+# ─────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+dist/
+dist-ssr/
+*.local
+
+# Vite / frontend
+.vite/
+*.tsbuildinfo
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+**/*.rs.bk
+*.pdb
+
+# Bundled-context staging (regenerated at build by scripts/bundle-context.mjs)
+src-tauri/context/
+
+# ─────────────────────────────────────────────────────────────
+# Construction-only agents borrowed from ../agents
+# (build scaffolding, NEVER shipped — deleted at release)
+# ─────────────────────────────────────────────────────────────
+build-agents/
+
+# ─────────────────────────────────────────────────────────────
+# Third-party skills — NOT ours. Excluded from the repo (each has its own
+# author/license; install separately). We ship ONLY GARY's own skills:
+# the board/connection source nodes + the apply engines. Whitelist below.
+# ─────────────────────────────────────────────────────────────
+.claude/skills/*
+!.claude/skills/SKILLS.md
+!.claude/skills/gary-job-search
+!.claude/skills/jnichollsc-job-search
+!.claude/skills/source-gmail
+!.claude/skills/source-linkedin
+!.claude/skills/source-getonbrd
+!.claude/skills/source-himalayas
+!.claude/skills/getonbrd-offers
+!.claude/skills/computrabajo-offers
+!.claude/skills/indeed-offers
+!.claude/skills/tecla-offers
+!.claude/skills/vanhack-offers
+!.claude/skills/xpertdirect-offers
+!.claude/skills/chrome-autoapply
+!.claude/skills/easyapply-autofill
+!.claude/skills/website-analyzer
+
+# Local Claude settings (machine-local personal config)
+.claude/settings.local.json
+
+# ─────────────────────────────────────────────────────────────
+# Secrets & local state (never commit)
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*auth*.json
+*.key
+*.pem
+.agent-browser/
+output/
+
+# ─────────────────────────────────────────────────────────────
+# Candidate-derived runtime instances
+# (generated from their *.example at session start; hold real PII)
+# ─────────────────────────────────────────────────────────────
+config/easyapply-filter.json
+portals.yml
+# Base-CV area holds the real CV PDF + the generated gary-context.md (real PII) — keep only the *.example
+data/cv/base/*
+!data/cv/base/*.example
+# ATS subsystem — per-session NotebookLM context clone (ephemeral, ATS-only)
+output/ats-session/
+
+# ─────────────────────────────────────────────────────────────
+# Runtime job-hunt data (the user's REAL search activity — never published;
+# only the candidate-agnostic *.example templates ship)
+# ─────────────────────────────────────────────────────────────
+engines/gmail-harvest/
+data/offers-master.md
+data/metrics.md
+data/orchestrator-state.md
+data/pipeline.md
+data/scan-history.tsv
+
+# ─────────────────────────────────────────────────────────────
+# Editor / IDE
+# ─────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ─────────────────────────────────────────────────────────────
+# Logs
+# ─────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─────────────────────────────────────────────────────────────
+# OS
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,66 @@
+<!--
+  offers-master.md.example — TEMPLATE for THE single canonical scored map of every offer.
+  The LM agent INSTANTIATES data/offers-master.md FROM THIS file at session start (only if the
+  runtime file is absent — otherwise it MERGES new survivors into the live file; never overwrite
+  history). NEVER edit this .example as if it were the live map.
+  Candidate-AGNOSTIC scaffolding: holds OFFERS + METRICS only — NEVER the user's PII (that lives
+  in the NotebookLM RAG / data/cv/base/gary-context.md).
+  On create, stamp: "> Instantiated by the LM agent at session start (from offers-master.md.example) — {absolute date}."
+
+  HOW THIS FILE WORKS
+  - One canonical doc, persists across sessions. Every sweep from EVERY channel MERGES its
+    survivors here after the two-way-fit gate — never scatter into dated/per-channel docs or
+    leave results only in survivors.json / an agent reply. (MANDATORY: persist after each connection.)
+  - Dedup per the candidate's preference (DATA in gary-context.md / NotebookLM). Common case: dedup ONLY by
+    exact offer (same posting/URL), NOT by company — multiple roles from one company ALL stay as separate rows.
+  - Score: 0–5 two-way-fit vs the candidate's role/skill map (data/cv/base/gary-context.md + RAG).
+    Only ≥4.0 are "apply"; 3.5–3.9 are "review"; <3.5 collapse into a one-line "discard".
+    COMP handling per the candidate's preference (DATA) — common case: informational, never a filter/penalty.
+  - Status boxes:  [ ] = pending · [x] = applied / closed / skip · [~] = flag.
+  - Region-locked lines (US/UK/EU/India/…-only, E-Verify/work-auth, hybrid/on-site elsewhere) are
+    DELETED unless the offer explicitly offers visa sponsorship. Closed/expired = [x].
+  - Row format:  - [ ] **{Company}** — {Role} — {score} — {url} — {channel} — {notes / status}
+  - Apply the ≤1-week recency rule (posted within 7 days) unless the user widens the window.
+
+  CHANNELS: A=LinkedIn EasyApply · B=Manual (GetOnBoard/Computrabajo/etc.) · C=LinkedIn-via-Gmail
+            · D=Himalayas · (add more as boards are wired). One section per channel.
+-->
+
+# Offers Master — every offer to apply to (consolidated, all channels)
+
+> Single canonical doc, persists across sessions. `[ ]` pending · `[x]` applied/closed/skip · `[~]` flag. **Mark on apply.** Last updated: **{{DATE}}**.
+
+## Session metrics ({{DATE}})
+
+> Local metrics for comparison across runs. Candidate context lives in NotebookLM; here we track only run stats + offer yield.
+
+- **Profile used:** {{ONE-LINE PROFILE FROM gary-context.md}}.
+- **Model:** {{MODEL}}.
+
+| Connection | Jobs seen | Reviewed | Useful (≥3.5) | Flag | Status |
+|---|---|---|---|---|---|
+| _(fill per channel)_ | | | | | |
+| **TOTAL** | | | | | |
+
+## Summary by channel
+
+| Channel | Offers (survivors) | Status |
+|---|---|---|
+| A · LinkedIn EasyApply | 0 | not run |
+| B · Manual (GetOnBoard / Computrabajo / …) | 0 | not run |
+| C · LinkedIn via Gmail alerts | 0 | not run |
+| D · Himalayas | 0 | not run |
+| **Applied total** | **0** | nothing applied (never auto-submit) |
+| **Actionable, not yet applied** | **0** | — |
+
+## CANAL A — LinkedIn EasyApply
+_(not run)_
+
+## CANAL B — Manual (GetOnBoard / Computrabajo / …)
+_(not run)_
+
+## CANAL C — LinkedIn via Gmail alerts
+_(not run)_
+
+## CANAL D — Himalayas
+_(not run)_

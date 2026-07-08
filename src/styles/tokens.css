@@ -1,0 +1,98 @@
+/* GARY 🐾 — design tokens. Single source of truth = docs/design-system.md §1–3.
+   Dark is the default (:root); light is a first-class peer ([data-theme="light"]).
+   Components must reference these variables — never raw hex. */
+
+/* Fonts (variable, display=swap) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Accent — warm amber kept in both themes */
+  --accent: #ce812d;
+  --accent-hover: #dea152;
+  --accent-pressed: #b86d1b;
+  --accent-soft: rgba(206, 129, 45, 0.18);
+  --accent-on: #140d09;
+
+  /* Warm dark neutrals derived from the brand browns */
+  --bg: #120d0c;
+  --surface: #1b1412;
+  --surface-2: #241a17;
+  --surface-3: #31211b;
+  --border: #4a2c20;
+  --border-strong: #6a3b28;
+  --text: #f3f3f3;
+  --text-secondary: #d6c5bd;
+  --text-muted: #a0a09f;
+  --text-on-accent: #140d09;
+
+  /* Semantic status (always paired with icon/text) */
+  --success: #79c27a;
+  --success-soft: rgba(121, 194, 122, 0.16);
+  --warning: #ce812d;
+  --warning-soft: rgba(206, 129, 45, 0.16);
+  --danger: #e17e67;
+  --danger-soft: rgba(225, 126, 103, 0.16);
+  --info: #d7b08a;
+  --info-soft: rgba(215, 176, 138, 0.16);
+
+  /* Typography */
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Plus Jakarta Sans", var(--font-ui);
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+
+  /* Spacing — 4/8 rhythm */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* Radius */
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-xl: 20px; --radius-full: 9999px;
+
+  /* Elevation (dark = borders + subtle lift) */
+  --elev-1: 0 0 0 1px var(--border);
+  --elev-2: 0 14px 36px rgba(0, 0, 0, 0.38);
+  --elev-3: 0 20px 52px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px var(--accent-soft);
+  --scrim: rgba(8, 5, 4, 0.68);
+
+  /* Motion */
+  --dur-fast: 120ms; --dur: 160ms; --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --sidebar-w: 260px;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --accent: #ce812d;
+  --accent-hover: #b3623d;
+  --accent-pressed: #9a532d;
+  --accent-soft: rgba(206, 129, 45, 0.14);
+  --accent-on: #ffffff;
+
+  --bg: #f3f3f3;
+  --surface: #ffffff;
+  --surface-2: #f5ece6;
+  --surface-3: #ead7cb;
+  --border: #d6beb3;
+  --border-strong: #c26942;
+  --text: #1b1412;
+  --text-secondary: #5d463d;
+  --text-muted: #786a63;
+  --text-on-accent: #ffffff;
+
+  --success: #2f7d4b; --success-soft: rgba(47, 125, 75, 0.1);
+  --warning: #ce812d; --warning-soft: rgba(206, 129, 45, 0.1);
+  --danger: #b3623d;  --danger-soft: rgba(179, 98, 61, 0.1);
+  --info: #8f634f;    --info-soft: rgba(143, 99, 79, 0.1);
+
+  --elev-1: 0 1px 2px rgba(91, 59, 43, 0.08), 0 10px 24px rgba(91, 59, 43, 0.06);
+  --elev-2: 0 10px 26px rgba(91, 59, 43, 0.12);
+  --elev-3: 0 20px 52px rgba(91, 59, 43, 0.18);
+  --scrim: rgba(44, 24, 15, 0.34);
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur: 0ms; --dur-slow: 0ms; }
+}

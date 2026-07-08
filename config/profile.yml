@@ -1,0 +1,139 @@
+# GARY Profile Configuration — CANDIDATE-AGNOSTIC TEMPLATE
+# Single source of truth for candidate DATA that the engines/skills read at runtime. GARY ships this
+# full of {{PLACEHOLDER}} tokens (no real PII). At onboarding, values are derived from the base CV and
+# the NotebookLM RAG. The METHODOLOGY that consumes these lives in docs/operating-rules.md +
+# docs/career-ops-map.md (candidate-agnostic). Swap this block for a real person and the engines run
+# unchanged. (Real, filled profiles are user-local and must NOT be committed.)
+
+candidate:
+  full_name: "{{FULL_NAME}}"
+  email: "{{EMAIL}}"
+  phone: "{{PHONE}}"
+  location: "{{CITY}}, {{COUNTRY}}"
+  linkedin: "{{LINKEDIN_URL}}"
+  portfolio_url: "{{PORTFOLIO_URL}}"
+  github: "{{GITHUB_URL}}"
+  twitter: ""
+
+target_roles:
+  # North Star roles — what the candidate is optimizing for (drives the scanner filter).
+  primary:
+    - "{{PRIMARY_ROLE_1}}"
+    - "{{PRIMARY_ROLE_2}}"
+  # Archetypes help the evaluation system score fit.
+  archetypes:
+    - name: "{{ARCHETYPE_NAME}}"
+      level: "{{LEVEL}}"
+      fit: "primary"        # primary = dream role, secondary = good fit, adjacent = stretch
+
+narrative:
+  headline: "{{HEADLINE}}"
+  exit_story: "{{EXIT_STORY}}"
+  superpowers:
+    - "{{SUPERPOWER}}"
+  proof_points:
+    - name: "{{PROOF_POINT_NAME}}"
+      url: ""
+      hero_metric: "{{HERO_METRIC}}"
+
+compensation:
+  target_range: "{{SALARY_RANGE}}"        # e.g. "USD X-Y/month" — monthly or annual, be consistent
+  currency: "{{SALARY_CURRENCY}}"
+  minimum: "{{SALARY_MIN}}"               # walk-away number — negotiation guide, NOT a hard filter
+  location_flexibility: "{{LOCATION_FLEXIBILITY}}"
+
+location:
+  country: "{{COUNTRY}}"
+  city: "{{CITY}}"
+  timezone: "{{TIMEZONE}}"
+  visa_status: "{{VISA_STATUS}}"          # e.g. relocation only with company visa sponsorship; else remote
+  onsite_availability: "{{ONSITE_AVAILABILITY}}"
+  relocation:
+    open: conditional                     # true | false | conditional
+    requires: "{{RELOCATION_REQUIRES}}"   # e.g. "company visa sponsorship"
+    notes: "{{RELOCATION_NOTES}}"
+
+interview:
+  # Availability the candidate offers for scheduling (in their timezone).
+  timezone: "{{TIMEZONE}}"
+  availability:
+    - "{{INTERVIEW_WINDOW}}"
+  notes: "Offer these windows when asked; convert to the interviewer's timezone."
+
+cv:
+  output_format: "html"                   # "html" (default) or "latex"
+
+cover_letter:
+  notice_period_days: 30
+  primary_domain: "{{PRIMARY_DOMAIN}}"
+
+# ── Auto-PDF threshold ──────────────────────────────────────────────────────
+# Auto-generate a tailored CV PDF only when an offer scores >= this value.
+auto_pdf_score_threshold: 4.0
+
+# ── Job-search operational DATA ─────────────────────────────────────────────
+job_search:
+  language:
+    working: ["Spanish", "English"]       # offers only in these languages; skip others (PT/FR/DE…)
+    english_level: "{{ENGLISH_LEVEL}}"    # CEFR; if below C1, reject roles mandating C1/C2 or a 3rd language
+  experience:
+    total_years: {{TOTAL_YOE}}            # reject 10+; flag 8–9 as stretch
+    profile: "{{PROFILE_SHAPE}}"          # e.g. "full-stack / frontend-dominant (NOT a backend specialist)"
+    note: "{{EXPERIENCE_NOTE}}"           # total YOE != domain YOE
+    gaps_source: "cv-data.md / NotebookLM RAG (skills with 0 YOE = never claim)"
+  gmail_alerts_account: "{{GMAIL_ALERTS_ACCOUNT}}"   # job-alert inbox, mined via the CDP browser — NOT the Claude Gmail connector account
+  automation_browser:
+    type: "Chrome (debug)"                # the default, tested/recommended engine
+    port: 9333                            # CDP port for the debug browser
+    profile: "%USERPROFILE%\\chrome-automation-profile"   # isolated, logged into the job accounts
+    launch: "engines/start-chrome-debug.cmd"
+    note: "Dedicated for ALL automation (sourcing + filling). The user's personal browser is OFF-LIMITS — never read/kill it. User-selectable in GARY Ajustes; whatever they pick is launched on the shown port."
+  # ONE-TIME SETUP: the user signs in to each mapped site IN THE AUTOMATION BROWSER (persists in the
+  # isolated profile). A not-logged-in site fails its CDP sweep. Google OAuth usually resists automation
+  # → use email+password or a non-Google provider.
+  mapped_sites:
+    - name: "Gmail (job-alerts inbox)"
+      url: "https://mail.google.com"
+      login: "email+password (the gmail_alerts_account above)"
+      role: "source — harvest alert emails"
+    - name: "LinkedIn"
+      url: "https://www.linkedin.com"
+      login: "email+password"
+      role: "source (Easy Apply + alerts) + apply"
+    - name: "Indeed"
+      url: "https://www.indeed.com"
+      login: "email+password"
+      role: "source (anti-bot; page-1 WebFetch + open-and-hand-off)"
+    - name: "GetOnBoard"
+      url: "https://www.getonbrd.com"
+      login: "LinkedIn or GitHub OAuth (NOT Google)"
+      role: "source (/myjobs + public API) + one-click Postular (user's click)"
+    - name: "Himalayas"
+      url: "https://himalayas.app"
+      login: "email+password"
+      role: "source (/jobs/matches; Cloudflare on detail pages; ≤2 concurrent WebFetch)"
+    - name: "Computrabajo"
+      url: "https://www.computrabajo.com"
+      login: "email+password"
+      role: "source (anonymous WebFetch) + one-click Aplicar"
+    - name: "Wellfound / xpertdirect / tecla / vanhack"
+      url: ""
+      login: "per-site"
+      role: "source; apply is one-click/vetting gate → user's action"
+  cooldowns:
+    # company: re-apply-not-before date (prior rejection / vetting cooldown). Example:
+    # "{{COMPANY}}": "YYYY-MM-DD"
+  profile_caveats:
+    # Free-text notes about profile quirks that affect apply flows (e.g. an education entry that blocks
+    # an ATS step). Candidate-specific — filled at onboarding. Example:
+    # education_note: "..."
+  eeo_self_id:            # user-given; used for EEO/self-ID form fields
+    gender: "{{EEO_GENDER}}"
+    pronouns: "{{EEO_PRONOUNS}}"
+    ethnicity: "{{EEO_ETHNICITY}}"
+    veteran: "{{EEO_VETERAN}}"
+    disability: "{{EEO_DISABILITY}}"
+    # age_range: ask the user (not stored)
+  dedup_caches:           # reset these when onboarding a different user
+    - "output/gmail-harvest/linkedin-seen.json"
+    - "data/applications.md"

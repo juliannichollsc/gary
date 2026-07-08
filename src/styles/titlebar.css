@@ -1,0 +1,78 @@
+/* GARY 🐾 — custom titlebar (window decorations are disabled in tauri.conf.json).
+   All titlebar styles live here; app.css is owned by another agent and must not be touched.
+   Tokens come from tokens.css so the bar follows the warm dark/light themes. */
+
+:root { --titlebar-h: 36px; }
+
+/* Vertical shell: titlebar pinned on top, the app fills the rest. Defined here so main.tsx can
+   wrap <App/> without editing app.css. The inner .app is height:100vh — we clamp it to the row. */
+.gary-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+.gary-shell__body { flex: 1 1 auto; min-height: 0; }
+.gary-shell__body .app { height: 100%; }
+
+.titlebar {
+  flex: 0 0 var(--titlebar-h);
+  height: var(--titlebar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Left: brand. This region is the drag handle. */
+.titlebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 100%;
+  flex: 1 1 auto;
+  padding: 0 var(--space-3);
+  min-width: 0;
+}
+.titlebar__logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+  flex: 0 0 auto;
+}
+.titlebar__word {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+/* Right: window controls. Not draggable so clicks reach the buttons. */
+.titlebar__controls {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  flex: 0 0 auto;
+}
+.titlebar__btn {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.titlebar__btn:hover { background: var(--surface-3); color: var(--text); }
+.titlebar__btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.titlebar__btn--close:hover { background: var(--danger); color: var(--accent-on); }
+.titlebar__btn svg { display: block; }

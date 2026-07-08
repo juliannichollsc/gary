@@ -1,0 +1,44 @@
+<!--
+  orchestrator-state.md.example — TEMPLATE for the persistent cross-session run state.
+  The LM agent INSTANTIATES data/orchestrator-state.md FROM THIS file at session start
+  (only if the runtime file is absent — otherwise it keeps appending to the live one; never
+  overwrite history). NEVER edit this .example as if it were the live state.
+  Candidate-AGNOSTIC — no person is named here; candidate facts live in the NotebookLM RAG /
+  data/cv/base/gary-context.md / config/.
+  On create, stamp: "> Instantiated by the LM agent at session start (from orchestrator-state.md.example) — {absolute date}."
+-->
+
+# Job-Apply Orchestrator — persistent state (cross-session memory)
+
+> Read at session start; update after every application/decision.
+
+## Standing goal
+Drive the candidate's applications (LinkedIn Easy Apply + external ATS + board apply flows) **to the "Submit application" step, fully filled from their profile**, then leave the final one-click Submit to the user. Keep going across offers until the target count is reached; never stop on a non-fit — skip and continue.
+
+## Two-way fit gate (apply only if BOTH hold)
+1. **Offer meets the candidate's needs:** modality/location eligible (remote-worldwide, remote-LATAM incl. their country, on-site/hybrid in their city, or explicit visa sponsorship), language ES/EN, seniority match (not junior/entry, not 10+ yrs). **Comp handling per the candidate's preference (DATA in gary-context.md / NotebookLM)** — common case: informational, NOT part of the gate.
+2. **Candidate meets ≥80% of the role's requirements WITHOUT inventing experience** (score vs the NotebookLM RAG / gary-context.md; gap skills as core → subtract).
+If either fails → **skip, continue to the next offer** (do not stop, do not fabricate).
+
+## Hard guardrails (never violate)
+- **Never click Submit. Never solve a captcha.** Fill to the Submit step and STOP — the final send is the user's click.
+- **Never fabricate.** Anything not grounded in the RAG / gary-context.md / profile, or any eligibility/legal/personal field → ASK the user, then `learn()` the answer (persist to the RAG + `config/apply-fieldmap.json`).
+- **Company-dedup per the candidate's preference (DATA in gary-context.md / NotebookLM)** — common case: multiple roles per company ALLOWED, dedup ONLY by exact offer (same posting/URL). Still skip an offer already *applied to*.
+- **One dedicated debug Chrome (:9333, isolated profile) for ALL automation.** Never touch the user's personal browser.
+- **Unmapped field → stop and ask** (do not guess).
+
+## Round runbook ("start round" → run end-to-end)
+1. **Bootstrap context:** analyze NotebookLM → (re)generate `data/cv/base/gary-context.md` from its `.example` if missing/stale (operating-rules §4).
+2. Verify Chrome:9333 up (poll `/json/version`). If down: `engines/start-chrome-debug.cmd`, then confirm the mapped sites are logged in.
+3. Read `data/applications.md` + `data/offers-master.md` for the company dedup list.
+4. **Harvest** per chosen channel → offer URLs (drop already-applied + tracked).
+5. **Triage** new companies (two-way-fit) → survivors → MERGE into `data/offers-master.md`.
+6. **Evaluate** survivors ≥4.0 → tailored CV (`cv-builder.mjs`).
+7. **Apply** serial on Chrome:9333 → fill to Submit, STOP. Hand the user the Submit list + CV paths. Update this file + `data/offers-master.md`.
+8. **Session end (MANDATORY, both triggers — user finaliza/para OR the hunt completes):** APPEND the hunt row(s) to `data/metrics.md` (strict format; on a stop also record ACTUAL + EXPECTED). No session closes without its metric row.
+
+## Learned rules (append; portable across sessions)
+- _(none yet — record each learned answer/rule here with an absolute date, e.g. "2026-07-02: …")_
+
+## Progress log (update each run, with absolute dates)
+- _(none yet — skeleton)_

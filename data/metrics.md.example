@@ -1,0 +1,42 @@
+<!--
+  metrics.md.example — TEMPLATE for THE historical hunt log (metrics.md).
+  The LM agent / engines INSTANTIATE data/metrics.md FROM THIS file (only if absent). NEVER edit this
+  .example as if it were the live log. metrics.md starts EMPTY ("arranca de 0"): engines/the agent
+  APPEND exactly one row per hunt after it finishes — they never rewrite history.
+  Candidate-AGNOSTIC. On create, stamp nothing inside "## Hunts" — leave it empty.
+
+  HOW THIS FILE WORKS
+  - One canonical log, persists across sessions. Every hunt (a sweep/filter across boards) APPENDS
+    exactly one row under "## Hunts" after it finishes (newest last; the UI shows newest first).
+  - Per hunt we record: fecha/hora (ISO-8601 local), modelo LLM, tokens gastados, total jobs found,
+    "real" jobs (survivors that fit the profile after the two-way-fit gate), y el desglose por fuente.
+  - **`tokens` = SOLO los tokens LLM del trabajo de BUSCAR y FILTRAR ofertas** (source / triage / evaluate /
+    apply-prep — p.ej. subagentes job-triage/job-evaluator). **NUNCA** incluye tokens gastados en cambios o
+    mejoras al PROYECTO (editar docs, código, specs, esta clase de mensajes de mantenimiento). Los engines
+    deterministas (`engines/*.mjs` por CDP/WebFetch) son token-free → cuentan 0. Si en una sesión no hubo
+    LLM de búsqueda (solo engines + trabajo de repo), `tokens=0`. Solo se instrumenta lo medible; si el
+    main-loop no está instrumentado y solo hizo trabajo de repo, no se imputa al hunt.
+  - Sourcing recency: por defecto el hunt filtra ofertas de la última semana (ventana configurable).
+  - SOURCES (fixed set, one column each): LinkedIn · Gmail · Indeed · GetOnBoard · Himalayas · Computrabajo · ATS.
+    (`ATS` = jobs del scanner zero-token de 16 providers `engines/scan.mjs`, aparte de las conexiones WebFetch/CDP.)
+    A source with 0 real jobs still lists 0 (keeps every row parseable with the same shape).
+  - Invariants (parser may assume): sum of the per-source values == real; real <= total.
+  - If a hunt is STOPPED early by the user, still APPEND its row with the ACTUAL totals reached, and put
+    an HTML comment ABOVE the row noting "STOPPED — <what didn't run> — expected ~<projection>" (comments
+    don't break the parser; the projection detail lives in data/offers-master.md).
+  - Row format (single line, ` — ` separated; per-source is `Fuente:N` comma-joined, fixed order):
+      - {YYYY-MM-DDThh:mm} — {model} — tokens={T} — total={N} — real={M} — LinkedIn:a, Gmail:b, Indeed:c, GetOnBoard:d, Himalayas:e, Computrabajo:f, ATS:g
+    Ejemplo (NO lo dejes aquí; solo referencia de formato):
+      - 2026-07-04T14:20 — claude-opus-4-8 — tokens=48210 — total=128 — real=41 — LinkedIn:18, Gmail:9, Indeed:1, GetOnBoard:7, Himalayas:5, Computrabajo:1, ATS:0
+  - A Rust command `read_metrics` (spec 07) parses "## Hunts" into `MetricsData`. Until it exists, the UI
+    falls back to an EMPTY state (arranca de 0).
+-->
+
+# Metrics — hunt log (histórico de búsquedas)
+
+> Registro histórico de cada hunt. Cada fila = una búsqueda/filtrado. `model` = LLM que lo corrió ·
+> `tokens` = gastados en la sesión · `total` = jobs encontrados · `real` = jobs reales para el perfil ·
+> desglose = jobs reales por fuente. Candidate-agnostic. Última actualización: _(none yet — empezar de 0)_.
+
+## Hunts
+<!-- Vacío a propósito: los engines APPENDean una fila por hunt (newest last). Ver formato arriba. -->

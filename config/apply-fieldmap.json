@@ -1,0 +1,58 @@
+{
+  "_doc": "CANDIDATE-AGNOSTIC answer map for job-application inputs. GARY ships this as a TEMPLATE full of {{PLACEHOLDER}} tokens — it holds NO real personal data. At onboarding, values are resolved from the candidate's CV + the NotebookLM RAG (never hardcoded here by hand). policy: FILL (auto-fill), FLAG (auto-fill but flag for user review), ASK_USER (screening/legal/eligibility OR not grounded in the CV/RAG — STOP, never invent). The engine appends newly-resolved fields to 'learned' after each application (ask-on-unmapped → learn → continue). NEVER fabricate: if an answer isn't grounded in the CV/profile/RAG or user-given, policy=ASK_USER. Methodology: docs/operating-rules.md + docs/career-ops-map.md.",
+  "_updated": "TEMPLATE — regenerated per candidate at onboarding",
+  "_placeholders": "Every {{TOKEN}} is filled from config/profile.yml + cv-data.md + the NotebookLM RAG. Delete this template's example rows only if a field truly does not apply.",
+  "fields": [
+    { "match": ["first name", "nombre"], "value": "{{FIRST_NAME}}", "source": "cv", "policy": "FILL" },
+    { "match": ["last name", "apellido", "surname"], "value": "{{LAST_NAME}}", "source": "cv", "policy": "FILL" },
+    { "match": ["full name", "your name", "nombre completo"], "value": "{{FULL_NAME}}", "source": "cv", "policy": "FILL" },
+    { "match": ["email", "correo", "e-mail"], "value": "{{EMAIL}}", "source": "cv", "policy": "FILL" },
+    { "match": ["phone", "teléfono", "mobile", "móvil", "celular", "contact number"], "value": "{{PHONE_E164}}", "source": "cv", "policy": "FILL", "note": "single field; if a SEPARATE country-code input exists pick {{PHONE_COUNTRY_CODE}} / {{COUNTRY}}" },
+    { "match": ["address", "dirección", "street"], "value": "{{ADDRESS}}", "source": "profile", "policy": "FILL" },
+    { "match": ["city", "ciudad", "current location", "ubicación actual", "where are you based"], "value": "{{CITY}}", "source": "profile", "policy": "FILL" },
+    { "match": ["state", "province", "provincia", "departamento"], "value": "{{STATE}}", "source": "profile", "policy": "FILL" },
+    { "match": ["postal", "zip", "código postal"], "value": "{{POSTAL_CODE}}", "source": "profile", "policy": "FILL" },
+    { "match": ["country", "país"], "value": "{{COUNTRY}}", "source": "profile", "policy": "FILL" },
+    { "match": ["linkedin"], "value": "{{LINKEDIN_URL}}", "source": "cv", "policy": "FILL" },
+    { "match": ["github"], "value": "{{GITHUB_URL}}", "source": "profile", "policy": "FILL" },
+    { "match": ["portfolio", "website", "personal site"], "value": "{{PORTFOLIO_URL}}", "source": "profile", "policy": "FILL" },
+    { "match": ["years of experience", "años de experiencia", "total experience", "professional experience", "overall experience", "total years", "years working", "how many years"], "value": "{{TOTAL_YOE}}", "source": "cv", "policy": "FILL", "note": "TOTAL YOE only — a specific stack is answered first by skill_years" },
+    { "match": ["current title", "current role", "job title", "puesto actual"], "value": "{{CURRENT_TITLE}}", "source": "cv", "policy": "FILL" },
+    { "match": ["current company", "current employer", "empresa actual"], "value": "{{CURRENT_COMPANY}}", "source": "cv", "policy": "FILL" },
+    { "match": ["highest level of education", "education level", "degree", "nivel de estudios"], "value": "{{EDUCATION_LEVEL}}", "source": "cv", "policy": "FLAG", "note": "If the CV credential has no clean equivalent in a fixed dropdown (e.g. a US degree scale), pick the CLOSEST honest option — NEVER upgrade to a degree not held. Flag for user review." },
+    { "match": ["school", "university", "institution", "universidad", "institución"], "value": "{{SCHOOL}}", "source": "cv", "policy": "FILL" },
+    { "match": ["field of study", "major", "área de estudio"], "value": "{{FIELD_OF_STUDY}}", "source": "cv", "policy": "FILL" },
+    { "match": ["languages", "idiomas"], "value": "{{LANGUAGES}}", "source": "cv", "policy": "FILL", "note": "e.g. 'English ({{ENGLISH_LEVEL}}), {{NATIVE_LANGUAGE}} (Native)'" },
+    { "match": ["english level", "nivel de inglés", "english proficiency"], "value": "{{ENGLISH_LEVEL}}", "source": "cv", "policy": "FILL", "note": "CEFR level; if the offer MANDATES a higher level than held, answer truthfully — this may disqualify → do not lie" },
+    { "match": ["salary", "compensation", "expected pay", "rate", "pretensión", "expectativa salarial", "salary expectation", "desired salary"], "value": "{{SALARY_EXPECTATION}} {{SALARY_CURRENCY}} (negotiable)", "source": "profile.compensation.target_range", "policy": "FILL", "note": "Match the form's period/currency: monthly vs annual, USD vs local. If asked in another currency, convert from the profile floor {{SALARY_MIN}} {{SALARY_CURRENCY}}." },
+    { "match": ["minimum salary", "salary floor", "walk-away", "salario mínimo"], "value": "{{SALARY_MIN}} {{SALARY_CURRENCY}}", "source": "profile.compensation.minimum", "policy": "FILL", "note": "Negotiation floor — never volunteer below this." },
+    { "match": ["notice period", "availability", "start date", "disponibilidad"], "value": "{{NOTICE_PERIOD}}", "source": "profile", "policy": "FLAG" },
+    { "match": ["modality", "work arrangement", "remote or on-site", "modalidad", "remote/hybrid/onsite"], "value": "{{WORK_MODALITY}}", "source": "profile.location_flexibility", "policy": "FILL", "note": "e.g. 'Remote (preferred); hybrid/on-site only in {{CITY}}; relocation only with visa sponsorship'" },
+    { "match": ["comfortable working in a remote", "remote setting", "work remotely", "comfortable remote", "open to remote"], "value": "{{REMOTE_OK}}", "source": "profile: remote preference", "policy": "FILL" },
+    { "match": ["willing to relocate", "open to relocation"], "value": "{{RELOCATION_ANSWER}}", "source": "profile.relocation", "policy": "FLAG", "note": "e.g. 'Only with visa sponsorship' — relocation is a personal call; flag." },
+    { "match": ["gender", "género", "sexo"], "value": "{{EEO_GENDER}}", "source": "profile.eeo_self_id", "policy": "FILL" },
+    { "match": ["pronouns", "pronombres"], "value": "{{EEO_PRONOUNS}}", "source": "profile.eeo_self_id", "policy": "FILL" },
+    { "match": ["race", "ethnicity", "raza", "etnia"], "value": "{{EEO_ETHNICITY}}", "source": "profile.eeo_self_id", "policy": "FILL" },
+    { "match": ["veteran", "protected veteran"], "value": "{{EEO_VETERAN}}", "source": "profile.eeo_self_id", "policy": "FILL" },
+    { "match": ["disability", "discapacidad"], "value": "{{EEO_DISABILITY}}", "source": "profile.eeo_self_id", "policy": "FILL" },
+    { "match": ["how did you hear", "source", "referral", "cómo te enteraste"], "value": "{{HEARD_FROM}}", "source": "given-safe", "policy": "FILL", "note": "safe default e.g. 'LinkedIn'" },
+    { "match": ["authorized to work", "legally authorized", "work authorization", "right to work", "autorización para trabajar"], "value": null, "source": "n/a", "policy": "ASK_USER", "note": "Eligibility/legal — the user answers. Depends on the offer's country vs the candidate's residency/visa status (config/profile.yml → location.visa_status)." },
+    { "match": ["require sponsorship", "need sponsorship", "visa", "patrocinio"], "value": null, "source": "n/a", "policy": "ASK_USER", "note": "Eligibility/legal — the user answers (typically Yes for on-site relocation; No for remote contractor)." },
+    { "match": ["security clearance", "clearance"], "value": null, "source": "n/a", "policy": "ASK_USER" },
+    { "match": ["criminal", "background check consent", "felony"], "value": null, "source": "n/a", "policy": "ASK_USER" }
+  ],
+  "skill_years": {
+    "_note": "CANDIDATE-AGNOSTIC template. Populate from the CV/RAG at onboarding: one key per skill → grounded YOE (integer). answerFor() uses these for 'years of X' AND 'experience/proficient with X' (years>0 => Yes). NEVER inflate; a skill the candidate lacks = 0 => honest No / learning. Keys shown are common tech-role examples; add/remove per the candidate's real stack. Replace every {{N}} with the grounded number.",
+    "_example_keys": ["react", "typescript", "javascript", "node", "angular", "next.js", "vue", "react native", "nestjs", "express", "python", "java", "go", "rust", "php", "laravel", "sql", "postgresql", "mysql", "html", "css", "tailwind", "docker", "kubernetes", "aws", "azure", "gcp", "graphql", "rest", "git", "ci/cd", "frontend", "backend", "full stack", "mobile", "ios", "android"],
+    "_gap_skills_are_zero": "Any skill the CV does NOT support MUST be 0 (never claim it). If asked years for a 0-skill → answer 0 / 'learning', never a positive number."
+  },
+  "learned": [
+    {
+      "_note": "GROWS at runtime via the ask-on-unmapped loop: when a form shows a field NOT matched above, GARY asks the user, then learn(matchTerms, value, source) appends it here (and mirrors it to the NotebookLM RAG) so it is never re-asked. Ships EMPTY per candidate — the entries below are FORMAT EXAMPLES only; delete them.",
+      "match": ["<example — delete>"],
+      "value": "<the user's resolved answer>",
+      "source": "user-given YYYY-MM-DD / cv / profile",
+      "policy": "FILL"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# pnpm build-script approvals (pnpm v11 `allowBuilds` map: dep -> true/false).
+# esbuild is vite's bundler and must run its install script; agent-browser is a Node-only
+# dev CLI whose postinstall we intentionally skip in the frontend build.
+allowBuilds:
+  esbuild: true
+  agent-browser: false

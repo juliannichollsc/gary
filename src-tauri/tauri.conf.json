@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "GARY",
+  "version": "0.1.0",
+  "identifier": "dev.gary.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build && node scripts/bundle-context.mjs"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "GARY 🐾",
+        "width": 1100,
+        "height": 760,
+        "resizable": true,
+        "decorations": false,
+        "dragDropEnabled": false
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Julian Nicholls C",
+    "resources": { "context": "context" },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}
