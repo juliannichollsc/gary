@@ -1,4 +1,8 @@
-# GARY 🐾
+<h1 align="center">GARY 🐾</h1>
+
+<p align="center">
+  <img src="docs/assets/gary-hero.png" alt="GARY — dein Copilot, der Jobs jagt" width="820">
+</p>
 
 > **G**uided **A**pplication & **R**ole **Y**ield — dein quelloffener Desktop-Copilot, der Jobs jagt, bewertet, anpasst und dir beim Bewerben hilft. Benannt nach einem echten Haustier.
 

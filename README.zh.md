@@ -1,4 +1,8 @@
-# GARY 🐾
+<h1 align="center">GARY 🐾</h1>
+
+<p align="center">
+  <img src="docs/assets/gary-hero.png" alt="GARY — 为你猎取工作的副驾" width="820">
+</p>
 
 > **G**uided **A**pplication & **R**ole **Y**ield —— 你的开源桌面副驾，帮你猎取、评估、定制并投递工作。以一只真实的宠物命名。
 

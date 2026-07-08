@@ -1,4 +1,8 @@
-# GARY 🐾
+<h1 align="center">GARY 🐾</h1>
+
+<p align="center">
+  <img src="docs/assets/gary-hero.png" alt="GARY — tu copiloto que caza empleos" width="820">
+</p>
 
 > **G**uided **A**pplication & **R**ole **Y**ield — tu copiloto de escritorio open source que caza, evalúa, adapta y te ayuda a postularte a empleos. Lleva el nombre de una mascota real.
 
