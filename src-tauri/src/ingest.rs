@@ -11,6 +11,7 @@ use std::process::{Command, Stdio};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 
+use crate::proc::hide_console;
 use crate::settings::project_root;
 
 // The bundled NotebookLM plugin (candidate-agnostic). We run it with `npx -y bun main.ts …` from its own
@@ -59,7 +60,7 @@ fn plugin_command(args: &[&str]) -> Result<Command, String> {
         c.args(["-y", "bun", "main.ts"]);
         c
     };
-    cmd.args(args).current_dir(&dir);
+    hide_console(&mut cmd).args(args).current_dir(&dir);
     Ok(cmd)
 }
 
@@ -219,37 +220,24 @@ pub fn notebooklm_status() -> bool {
     has("SID") && has("__Secure-1PSID")
 }
 
-// One-shot session verify + cookie bridge — the Connections pattern applied to NotebookLM. Reads the Google
-// session from the ALREADY-RUNNING automation browser (:9333) via `engines/notebooklm-session.mjs` (one CDP
-// read, no second browser, no polling), then hands the cookies to the plugin's `login --cookies` so its RPC
-// calls authenticate. Returns true iff the session was captured and saved. The webview should race this with
-// its own timeout (like `verify` in Sidebar.tsx) so a hung CDP read can't pin the UI.
+// Session verify — DELEGADO ENTERAMENTE AL PLUGIN (decisión del owner). `login --force` abre el Chrome del
+// propio plugin (su perfil en %APPDATA%/notebooklm-ai/chrome-profile), espera a que el usuario inicie sesión
+// —sondeando hasta 5 min— y escribe `cookies.json` él mismo. Es el flujo que ya funcionaba antes de empaquetar
+// la app; GARY no vuelve a tocar las cookies.
+//
+// `--force` es obligatorio: sin él, `handleLogin` (main.ts:155) ve unas cookies CADUCADAS que aún tienen SID +
+// __Secure-1PSID, responde "Already authenticated" y sale con éxito sin validar nada contra Google — y la
+// ingesta muere después en `notebooks create`.
+//
+// Puede tardar minutos (login interactivo), así que la webview debe darle margen: `verifyNlm` corre esto
+// contra su propio timeout.
 #[tauri::command]
 pub async fn connect_notebooklm() -> Result<bool, String> {
-    let root = project_root();
-    let engine = root.join("engines").join("notebooklm-session.mjs");
-    if !engine.exists() {
-        return Err("engine notebooklm-session.mjs no encontrado".into());
-    }
     tauri::async_runtime::spawn_blocking(move || {
-        // 1) Grab cookies from the automation browser (0 tokens, attaches to the open tab).
-        let out = Command::new("node")
-            .arg(&engine)
-            .current_dir(&root)
+        let out = plugin_command(&["login", "--force"])?
             .output()
-            .map_err(|e| format!("no se pudo correr el engine: {e}"))?;
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        let header = stdout
-            .lines()
-            .find_map(|l| l.trim().strip_prefix("COOKIES: ").map(str::to_string));
-        let Some(header) = header else {
-            return Ok(false); // navegador cerrado o sesión de Google no iniciada → "Conectar"
-        };
-        // 2) Hand them to the plugin so it authenticates without launching its own browser.
-        let login = plugin_command(&["login", "--cookies", &header])?
-            .output()
-            .map_err(|e| format!("no se pudo guardar la sesión: {e}"))?;
-        Ok(login.status.success())
+            .map_err(|e| format!("no se pudo iniciar sesión: {e}"))?;
+        Ok(out.status.success())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -290,9 +278,15 @@ pub async fn start_ingest(
         macro_rules! create_notebook {
             () => {{
                 emit(json!({ "kind": "log", "line": "· Creando notebook de contexto…" }));
+                // `notebooklm_status()` sólo confirma que el archivo de cookies EXISTE, no que Google las
+                // acepte: unas cookies caducadas llegan hasta aquí y el plugin responde "redirected to
+                // Google login". Se traduce a la acción que resuelve el caso, en vez del error crudo.
                 let out = match run_plugin(&app, &["notebooks", "create", "--name", "GARY", "--json"]) {
                     Ok(o) => o,
-                    Err(e) => bail!(format!("No se pudo crear el notebook: {e}")),
+                    Err(e) => bail!(format!(
+                        "No se pudo crear el notebook ({e}). Si tu sesión de Google caducó, pulsa \
+                         Conectar → Verificar sesión para renovarla."
+                    )),
                 };
                 match parse_notebook_id(&out) {
                     Some(id) => id,

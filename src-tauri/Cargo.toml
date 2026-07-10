@@ -1,6 +1,6 @@
 [package]
 name = "gary"
-version = "0.1.0"
+version = "0.1.2"
 description = "GARY — desktop copilot for job hunting"
 authors = ["Julián Nicholls"]
 license = "MIT"

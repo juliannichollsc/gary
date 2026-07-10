@@ -48,6 +48,9 @@ build-agents/
 !.claude/skills/chrome-autoapply
 !.claude/skills/easyapply-autofill
 !.claude/skills/website-analyzer
+# Excepción: de terceros (MIT) pero REQUISITO de runtime — src-tauri/src/ingest.rs lo ejecuta por ruta
+# y scripts/bundle-context.mjs lo mete en el instalador. Sin él la ingesta a NotebookLM no arranca.
+!.claude/skills/notebooklm-ai-plugin
 
 # Local Claude settings (machine-local personal config)
 .claude/settings.local.json

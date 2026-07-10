@@ -6,10 +6,7 @@ import { Avatar, Button, Chip, StatusDot } from "../components/ui";
 import { TutorialButton } from "../components/TutorialButton";
 import { Check, File, Upload, X, Plus, Loader } from "../icons";
 import { useT, useLang, setLang, LANGS, type Lang } from "../i18n";
-import {
-  notebooklmStatus, connectNotebooklm, openInBrowser,
-  browserStatus, startBrowser, loadSettings,
-} from "../settings";
+import { notebooklmStatus, connectNotebooklm } from "../settings";
 import {
   type CvFile, type RoleVariant, type IngestEvent, type CandidateProfile, type WorkModality, type ContactLink,
   EMPTY_PROFILE, CURRENCIES,
@@ -20,7 +17,6 @@ import {
 // llena el agente LM (lee CV + NotebookLM en el chat); en el onboarding es solo informativo la 1ª vez.
 const STEPS = ["ob.step.cv", "ob.step.ingest", "ob.step.questions", "ob.step.roles"]; // i18n keys
 const LAST = STEPS.length; // 4
-const NOTEBOOKLM_URL = "https://notebooklm.google.com/";
 
 // Estado de la sesión de NotebookLM (mismo patrón que Conexiones en Sidebar, sin polling):
 // unknown → (check) → connected | disconnected; Conectar → pending; Verificar → checking → connected/pending.
@@ -80,16 +76,6 @@ export function OnboardingView(
     return () => abortRef.current?.abort();
   }, []);
 
-  // Asegura el navegador de automatización ARRIBA — mismo patrón que Ajustes/Conexiones: si está caído lo
-  // INICIA con el navegador + puerto CONFIGURADOS EN AJUSTES (leídos frescos aquí, NO el default, para no
-  // depender del timing de carga). Así la verificación de NotebookLM no falla por "el navegador no está abierto".
-  const ensureBrowser = async (): Promise<boolean> => {
-    const b = await browserStatus();
-    if (b.running) return true;
-    const s = await loadSettings(); // el MISMO navegador/puerto de Ajustes
-    const st = await startBrowser(s.browser, s.browserPort);
-    return !!st?.running;
-  };
 
   // Refrescar el mapa de roles cuando la ventana recupera el foco: el agente (en el chat) pudo terminar de
   // mapear roles/skills en gary-context.md mientras mirabas otra cosa. Sólo pisa roles/soft-skills si el
@@ -134,21 +120,16 @@ export function OnboardingView(
   // En modo tutorial NO persistimos (el paso se fuerza solo para mostrar; no debe pisar el paso real guardado).
   useEffect(() => { if (file && !tutorial) persist({ step }); }, [step, file]);
 
-  // Al ENTRAR al paso 2 (Ingestar) sin sesión de NotebookLM lista: arranca el navegador de automatización
-  // (el MISMO de Ajustes) y abre NotebookLM de una vez, ANTES de que el usuario pulse "Verificar sesión",
-  // para que el puerto ya esté arriba y la verificación no falle por "no está abierto". Una sola vez por
-  // entrada al paso (el ref evita relanzar por cada re-render). Si ya está conectado, no se toca el navegador.
+  // Al ENTRAR al paso 2 (Ingestar) sin sesión lista, sólo dejamos el paso en "pending" para que el usuario
+  // pulse "Verificar sesión". NO abrimos el navegador de automatización: la autenticación de NotebookLM la
+  // hace el plugin con su propio Chrome (`login --force`), y levantar :9333 aquí sólo abría una ventana inútil.
   useEffect(() => {
-    if (tutorial) { openedForStep2.current = false; return; } // en tutorial no lanzamos navegador (solo mostramos)
+    if (tutorial) { openedForStep2.current = false; return; } // en tutorial no tocamos el estado (solo mostramos)
     if (step !== 2) { openedForStep2.current = false; return; }
     if (openedForStep2.current) return;
-    if (nlmConn !== "disconnected" && nlmConn !== "pending") return; // unknown/connected/checking → nada
+    if (nlmConn !== "disconnected") return; // unknown/pending/connected/checking → nada
     openedForStep2.current = true;
-    (async () => {
-      await ensureBrowser();
-      await openInBrowser(NOTEBOOKLM_URL);
-      setNlmConn((c) => (c === "disconnected" ? "pending" : c)); // ya "conectamos" → falta que el usuario verifique
-    })();
+    setNlmConn("pending");
   }, [step, nlmConn]);
 
   async function onPick(f: File) {
@@ -197,25 +178,19 @@ export function OnboardingView(
     finally { if (!ac.signal.aborted) setIngesting(false); }
   }
 
-  // Conectar NotebookLM: arranca el navegador de automatización (el MISMO de Ajustes) si está caído y abre
-  // NotebookLM (:puerto configurado, el que ya tiene Gmail) para que el usuario entre a la app. Así el puerto
-  // siempre queda arriba sin tener que iniciarlo a mano en Ajustes.
-  async function connectNlm() {
+  // Conectar NotebookLM: no abrimos nada nosotros — el plugin abre SU propio Chrome al verificar. Este botón
+  // sólo deja el paso listo para pulsar "Verificar sesión".
+  function connectNlm() {
     setError(null);
-    await ensureBrowser();
-    await openInBrowser(NOTEBOOKLM_URL);
     setNlmConn("pending");
   }
-  // Verificar sesión: UN solo chequeo (sin polling → sin bucle). Lee las cookies del navegador y las guarda
-  // en el plugin; con timeout por si el CDP se cuelga. Al conectar, arranca la ingesta si hay CV.
+  // Verificar sesión: delega TODO en el plugin (`login --force`), que abre su Chrome, espera el login de Google
+  // y guarda las cookies. Si la sesión de ese perfil sigue viva, vuelve al instante sin interacción; si caducó,
+  // el usuario entra en la ventana. Damos margen a ese login interactivo (el plugin sondea hasta 5 min).
   async function verifyNlm() {
     if (nlmConn === "checking") return;
     setNlmConn("checking");
-    // Asegura el navegador (:puerto de Ajustes) ARRIBA + NotebookLM abierto ANTES de leer cookies, para no
-    // fallar por "el navegador no está abierto". Si estaba caído, lo inicia y abre (igual que Ajustes/Conexiones).
-    await ensureBrowser();
-    await openInBrowser(NOTEBOOKLM_URL);
-    const timeout = new Promise<boolean>((r) => setTimeout(() => r(false), 70_000));
+    const timeout = new Promise<boolean>((r) => setTimeout(() => r(false), 6 * 60_000));
     const ok = await Promise.race([connectNotebooklm(), timeout]);
     setNlmConn(ok ? "connected" : "pending");
     if (ok && file && !ingestDone && !ingesting) startIngest(file);

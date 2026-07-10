@@ -27,7 +27,8 @@ fn copy_dir_all(src: &Path, dst: &Path, overwrite: bool) -> std::io::Result<()> 
 }
 
 // Product dirs that carry NO user edits → safe to refresh wholesale on version bump.
-const PRODUCT_DIRS: [&str; 4] = [".claude", "docs", "engines", "templates"];
+// `node_modules` = las deps de runtime de los engines (playwright), staged por bundle-context.mjs.
+const PRODUCT_DIRS: [&str; 5] = [".claude", "docs", "engines", "templates", "node_modules"];
 
 pub fn bootstrap(app: &tauri::App) {
     // Bundled context present? (absent in `tauri dev` → keep repo-root behavior)
