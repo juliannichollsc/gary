@@ -156,6 +156,16 @@ build time. Field answers/rules are persisted to the RAG, never hardcoded.
   `data/offers-master.md → ## CANAL ATS` (title+URL+location, `filt:` date, tag `_(ATS: solo título, sin WebFetch)_`);
   the user reads each JD on open. Metrics MANDATORY with **`tokens=0`** (all deterministic), counted in the `ATS`
   column. Fully candidate-agnostic. Full rule: `docs/operating-rules.md §4`.
+- **MANDATORY — source EVERY channel through GARY's automation browser (:9333), NEVER through Claude's
+  built-in MCP connectors.** GARY's connections are the sessions the user logged in + validated in the
+  **Conexiones** panel, living in the dedicated debug Chrome (`config/profile.yml` →
+  `job_search.automation_browser`). Gmail job-alerts MUST be harvested from THAT logged-in Gmail tab via
+  `node engines/gmail-harvest.mjs` over CDP — do **NOT** call a Claude Gmail/Calendar/Drive MCP connector to
+  read alerts: the Claude connector is bound to a DIFFERENT Google account than the one the user validated in
+  GARY, so it returns the wrong inbox (no alerts) and breaks the "use the connection the user verified"
+  contract. Same principle for every source node — the source-of-truth is always the validated :9333 session
+  + the `source-*`/engine skills, never a Claude-side MCP connector. If the needed tab isn't logged in,
+  prompt the user to sign in it (Conexiones), never fall back to a Claude connector or the personal browser.
 - **MANDATORY — generate runtime docs FROM `*.example` templates; never hand-edit the templates.** The
   committed source-of-truth for each generated context doc is its `.example` sibling (candidate-agnostic,
   PII-free). `data/cv/base/gary-context.md` ← `…/gary-context.md.example` is **created ONCE at CV ingestion**

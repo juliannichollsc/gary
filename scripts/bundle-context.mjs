@@ -95,6 +95,11 @@ function copyPackage(name, fromDir) {
 }
 const playwrightDir = copyPackage('playwright', root);
 copyPackage('playwright-core', playwrightDir);
+// `js-yaml` es dependencia DIRECTA (package.json) y la importan al TOPE del módulo `scan.mjs` (el canal
+// ATS de 16 providers), `tracker.mjs` y `analyze-patterns.mjs` → sin él, esos engines mueren con
+// ERR_MODULE_NOT_FOUND al cargar, antes de ejecutar nada (mismo fallo que playwright en "Verificar
+// conexiones"). Se resuelve desde la raíz.
+copyPackage('js-yaml', root);
 
 // Root context files the CLI reads.
 for (const f of ['AGENTS.md', 'CLAUDE.md', 'cv-data.md', 'package.json', 'pnpm-lock.yaml', '.npmrc', '.env.example'])
