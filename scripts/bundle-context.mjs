@@ -6,7 +6,8 @@
 // HARD RULE: never stage real PII / the user's runtime data. We copy an explicit allow-list and
 // filter out the known runtime/PII paths (gmail-harvest, generated configs, the real CV, hunt data).
 import { cpSync, rmSync, mkdirSync, existsSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, basename, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 
 const root = process.cwd();
 const out = join(root, 'src-tauri', 'context');
@@ -54,6 +55,11 @@ copyDir('.claude/commands');
 copyFile('.claude/skills/SKILLS.md');
 for (const s of SKILLS) copyDir(`.claude/skills/${s}`);
 
+// El plugin de NotebookLM (RAG del candidato). Vive gitignorado en `.claude/skills/` como skill
+// instalada, pero el core Rust lo ejecuta por ruta (ingest.rs → plugin_scripts_dir), así que DEBE
+// viajar en el instalador o la ingesta falla con "plugin de NotebookLM no encontrado".
+copyDir('.claude/skills/notebooklm-ai-plugin');
+
 // Methodology + data map (all agnostic).
 copyDir('docs');
 
@@ -70,6 +76,25 @@ for (const f of ['offers-master', 'metrics', 'orchestrator-state'])
 copyFile('data/cv/base/gary-context.md.example');
 for (const f of ['applications.md', 'filters.md', 'easyapply-questions.md', 'linkedin-playbook.md'])
   copyFile(`data/${f}`);
+
+// Dependencias de runtime de los engines. En el repo `playwright` resuelve por el `node_modules/` de al
+// lado; en la app instalada los engines corren con CWD = workspace, donde no hay ninguno → todos morían con
+// ERR_MODULE_NOT_FOUND (así se cayó "Verificar conexiones" al empaquetar). Los engines de conexión sólo
+// hacen `chromium.connectOverCDP` contra el Chrome ya abierto, así que NO hace falta el navegador que
+// descarga `playwright install` — sólo los dos paquetes JS. pnpm los enlaza por symlink al store, de modo
+// que hay que resolverlos y copiar el contenido real (`dereference`).
+// `playwright-core` no es dependencia DIRECTA del repo, así que con el node_modules estricto de pnpm no
+// resuelve desde la raíz: hay que pedírselo a `playwright`, que es quien lo declara. Copiamos ambos planos
+// bajo `context/node_modules/` — el `require('playwright-core')` interno de playwright sube un nivel y lo
+// encuentra ahí.
+function copyPackage(name, fromDir) {
+  const req = createRequire(join(fromDir, 'noop.js'));
+  const pkgDir = dirname(req.resolve(`${name}/package.json`));
+  cpSync(pkgDir, join(out, 'node_modules', name), { recursive: true, dereference: true });
+  return pkgDir;
+}
+const playwrightDir = copyPackage('playwright', root);
+copyPackage('playwright-core', playwrightDir);
 
 // Root context files the CLI reads.
 for (const f of ['AGENTS.md', 'CLAUDE.md', 'cv-data.md', 'package.json', 'pnpm-lock.yaml', '.npmrc', '.env.example'])

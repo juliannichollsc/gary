@@ -9,6 +9,8 @@ use std::io::{BufRead, BufReader};
 use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+
+use crate::proc::hide_console;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -129,6 +131,7 @@ pub fn run_engine(
     }
 
     let mut cmd = Command::new("node");
+    hide_console(&mut cmd);
     cmd.arg(&script)
         .args(&args)
         .current_dir(&root)

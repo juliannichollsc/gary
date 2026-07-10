@@ -3,6 +3,8 @@
 // keychain (never on disk). The browser is the dedicated debug Chrome for CDP sourcing/applying.
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+
+use crate::proc::hide_console;
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
@@ -201,7 +203,7 @@ pub fn start_browser(state: State<BrowserState>, app: tauri::AppHandle, browser:
             // Fallback solo para chrome: el .cmd legacy si el exe no se resolvió.
             let script = engine_script();
             if browser == "chrome" && script.exists() {
-                Command::new("cmd").arg("/C").arg(&script)
+                hide_console(&mut Command::new("cmd")).arg("/C").arg(&script)
                     .env("GARY_BROWSER_PORT", port.to_string())
                     .spawn().map_err(|e| e.to_string())?
             } else {
@@ -243,7 +245,7 @@ pub async fn check_login(url: String) -> Result<bool, String> {
     let script = if light.exists() { light } else { root.join("engines").join("inspect-session-site.mjs") };
     if !script.exists() { return Ok(false); }
     let out = tauri::async_runtime::spawn_blocking(move || {
-        Command::new("node").arg(&script).arg(&url).current_dir(&root).output()
+        hide_console(&mut Command::new("node")).arg(&script).arg(&url).current_dir(&root).output()
     }).await.map_err(|e| e.to_string())?;
     Ok(matches!(out, Ok(o) if String::from_utf8_lossy(&o.stdout).contains("logged in: likely YES")))
 }
@@ -261,7 +263,7 @@ pub fn open_path(path: String) -> Result<(), String> {
         full.to_string_lossy().to_string()
     };
     let spawned = if cfg!(windows) {
-        Command::new("cmd").args(["/C", "start", "", &full_s]).spawn()
+        hide_console(&mut Command::new("cmd")).args(["/C", "start", "", &full_s]).spawn()
     } else if cfg!(target_os = "macos") {
         Command::new("open").arg(&full_s).spawn()
     } else {

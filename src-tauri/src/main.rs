@@ -8,6 +8,7 @@
 mod data;
 mod engines;
 mod ingest;
+mod proc;
 mod settings;
 mod workspace;
 

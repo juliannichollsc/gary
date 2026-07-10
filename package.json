@@ -1,7 +1,7 @@
 {
   "name": "gary",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "type": "module",
   "description": "GARY — open-source desktop copilot for job hunting (Tauri + Rust, model-agnostic).",
   "license": "MIT",
