@@ -58,7 +58,7 @@ corepack enable pnpm   # GARY nutzt pnpm (nicht npm)
 pnpm install
 pnpm tauri dev
 ```
-Benötigt Rust ≥ 1.96 + Node ≥ 18 + pnpm ≥ 9 (Windows: MSVC C++ Build Tools + WebView2). Siehe `CLAUDE.md` für die Build-Aufgabenliste und `docs/operating-rules.md` für die Methodik.
+Benötigt Rust ≥ 1.96 + Node ≥ 22.13 + pnpm ≥ 11 (Windows: MSVC C++ Build Tools + WebView2). Siehe `CLAUDE.md` für die Build-Aufgabenliste und `docs/operating-rules.md` für die Methodik.
 
 > **Plattform: vorerst nur Windows.** Der Installer wird als Windows-`.exe` (NSIS) ausgeliefert. Linux-/macOS-Builds sind auf der Roadmap, brauchen aber einen Portierungsschritt und sind noch nicht verfügbar.
 

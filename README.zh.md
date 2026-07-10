@@ -58,7 +58,7 @@ corepack enable pnpm   # GARY 使用 pnpm（不是 npm）
 pnpm install
 pnpm tauri dev
 ```
-需要 Rust ≥ 1.96 + Node ≥ 18 + pnpm ≥ 9（Windows：MSVC C++ Build Tools + WebView2）。构建任务清单见 `CLAUDE.md`，方法论见 `docs/operating-rules.md`。
+需要 Rust ≥ 1.96 + Node ≥ 22.13 + pnpm ≥ 11（Windows：MSVC C++ Build Tools + WebView2）。构建任务清单见 `CLAUDE.md`，方法论见 `docs/operating-rules.md`。
 
 > **平台：目前仅支持 Windows。** 安装程序以 Windows `.exe`（NSIS）形式发布。Linux/macOS 版本已在路线图中，但需要一次可移植性改造，暂不可用。
 

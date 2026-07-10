@@ -95,7 +95,7 @@ verify locally. Build in order; don't start a stage until the previous one runs.
   `docs/components.md`. `pencil/PROMPTS.md` holds the resolved art direction per screen.
 
 ## Prerequisites to run
-1. **Node** ≥ 18 + **pnpm** ≥ 9 (`corepack enable pnpm`). **Rust** ≥ 1.96. **Use pnpm — NOT npm/yarn.**
+1. **Node** ≥ 22.13 + **pnpm** ≥ 11 (`corepack enable pnpm`). **Rust** ≥ 1.96. **Use pnpm — NOT npm/yarn.**
 2. **Windows:** Tauri needs **MSVC C++ Build Tools** ("Desktop development with C++"). **WebView2** runtime.
 
 ## How to run (local)

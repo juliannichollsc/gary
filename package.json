@@ -7,8 +7,8 @@
   "license": "MIT",
   "packageManager": "pnpm@11.1.2",
   "engines": {
-    "pnpm": ">=9",
-    "node": ">=18"
+    "pnpm": ">=11",
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "vite",

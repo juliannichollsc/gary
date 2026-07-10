@@ -30,10 +30,12 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
+      # pnpm 11 (el que fija `packageManager`) requiere Node >= 22.13: usa `node:sqlite` para su store, un
+      # built-in que Node 20 no tiene → ERR_UNKNOWN_BUILTIN_MODULE. Mantener esto >= 22.13.
       - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - name: Install Rust
