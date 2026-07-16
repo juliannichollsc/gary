@@ -83,7 +83,15 @@ output/ats-session/
 # Runtime job-hunt data (the user's REAL search activity — never published;
 # only the candidate-agnostic *.example templates ship)
 # ─────────────────────────────────────────────────────────────
+# The harvest = the user's REAL inbox/offer URLs. NEVER publish it.
+# `output/` (above) covers the canonical location. This second rule stays as belt-and-braces: gmail-harvest.mjs
+# used to write NEXT TO ITSELF (engines/gmail-harvest/) instead of to output/gmail-harvest/ — fixed, but any
+# stale dir from an older build, or an older engine, must never become committable. Keep this rule.
 engines/gmail-harvest/
+# Per-offer evaluation reports + the tracker-additions queue: written by verify-pipeline.mjs /
+# reserve-report-num.mjs / merge-tracker.mjs at the PROJECT ROOT. Real candidate data → never commit.
+reports/
+batch/
 data/offers-master.md
 data/metrics.md
 data/orchestrator-state.md

@@ -10,11 +10,13 @@
  */
 
 import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 
-const CAREER_OPS = dirname(fileURLToPath(import.meta.url));
+// PROJECT ROOT — `engines/..`, NOT `engines/` (ported from career-ops, where these scripts sat at the repo
+// root). See merge-tracker.mjs for the full note.
+const CAREER_OPS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Support both layouts: data/applications.md (boilerplate) and applications.md
 // (original). CAREER_OPS_TRACKER lets tests point the script at an isolated
 // fixture so the real user tracker is never touched.

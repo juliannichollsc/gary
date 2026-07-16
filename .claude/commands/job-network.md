@@ -23,7 +23,7 @@ All CDP work goes through the ONE dedicated debug Chrome defined in `config/prof
 2. **Triage (parallel, WebFetch — safe to fan out ≤3):** route each platform's URLs to `job-triage` (or the source agent's own triage). Filter eligibility / comp / YOE / hard-req / company-dedup vs `data/applications.md` / liveness. Prioritize Easy Apply + external-ATS (auto-fillable) over one-click/manual.
 3. **Evaluate (parallel ≤3):** for survivors ≥4.0 that pass the two-way-fit gate, `job-evaluator` writes report + tailors CV + stages tracker TSV (orchestrator pre-assigns report/tracker numbers).
 4. **Auto-apply (serial CDP burst):** `job-apply-prep` opens each greenlit offer and auto-fills (LinkedIn Easy Apply / external ATS via `apply-from-linkedin.mjs`; GetOnBoard → open for Postular) using the field map at `config/apply-fieldmap.json`. **Stop before Submit.** Run these one at a time in a stable post-relaunch window.
-5. **Merge + report:** `node merge-tracker.mjs` → `node verify-pipeline.mjs`. Report the auto-apply margin (filled / found-eligible) toward the 70–75% target, and hand the user the captcha+Submit list with CV paths.
+5. **Merge + report:** `node engines/merge-tracker.mjs` → `node engines/verify-pipeline.mjs` (CWD = project root). Report the auto-apply margin (filled / found-eligible) toward the 70–75% target, and hand the user the captcha+Submit list with CV paths.
 
 ## New websites
 When the user names a new site, dispatch `website-analyzer` first; if feasible, add a `source-<site>` node and update the skill's website registry. The network grows.

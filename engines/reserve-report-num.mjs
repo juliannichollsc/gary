@@ -37,11 +37,12 @@
  */
 
 import { readdirSync, writeFileSync, unlinkSync, statSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPORTS_DIR = join(__dirname, 'reports');
+// `engines/..`, NOT `engines/` — reports live at the PROJECT ROOT. See merge-tracker.mjs for the full note.
+const REPORTS_DIR = join(resolve(__dirname, '..'), 'reports');
 
 // Sentinels older than this are considered stale and may be GC'd.
 // 4 hours covers any reasonable interactive or batch session.

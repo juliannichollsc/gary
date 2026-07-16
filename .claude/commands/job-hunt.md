@@ -26,7 +26,7 @@ All CDP work goes through the ONE dedicated debug Chrome defined in `config/prof
 
 4. **Evaluate (delegate, ≤3 concurrent):** spawn `job-evaluator` agents, ≤2 offers each with their assigned numbers. Each writes its report + CV + `batch/tracker-additions/*.tsv`.
 
-5. **Merge + verify (orchestrator):** `node merge-tracker.mjs` then `node verify-pipeline.mjs`. Fix any errors.
+5. **Merge + verify (orchestrator):** `node engines/merge-tracker.mjs` then `node engines/verify-pipeline.mjs` (CWD = project root). Fix any errors.
 
 6. **Present + (optional) apply-prep:** show the user the ranked survivors with score + CV path + flags. For the ones they greenlight (score ≥ 4.0, two-way-fit gate passed, flags resolved), spawn `job-apply-prep` to open them — **always stop before Submit** (the final click + captcha are the user's). The user submits.
 

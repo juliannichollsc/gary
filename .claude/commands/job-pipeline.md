@@ -21,7 +21,7 @@ Any CDP-dependent step goes through the ONE dedicated debug Chrome defined in `c
    - The moment triage returns survivors, dispatch `job-evaluator` (≤2 offers each, with their assigned numbers) into any free slot — don't wait for the rest of triage to finish.
    - The moment an evaluator's report is written AND the user has greenlit that offer (score ≥ 4.0, two-way-fit gate passed, flags resolved), dispatch `job-apply-prep` into a free slot.
    - Always keep ≤3 in flight; refill as slots free.
-4. **Merge + verify (orchestrator, once near the end):** `node merge-tracker.mjs` → `node verify-pipeline.mjs`.
+4. **Merge + verify (orchestrator, once near the end):** `node engines/merge-tracker.mjs` → `node engines/verify-pipeline.mjs` (CWD = project root).
 5. **Present** the ranked survivors with score + exact CV path + flags; `job-apply-prep` opens the greenlit ones and **stops before Submit** (the final click + captcha are the user's — the user submits). The canonical scored map lives at `data/offers-master.md`.
 
 ## Guardrails

@@ -11,11 +11,15 @@
  */
 
 import { readFileSync, existsSync, statSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const projectRoot = __dirname;
+// `engines/..`, NOT `engines/` — this script was ported from career-ops, where it sat at the repo root, so
+// `__dirname` WAS the project root. See merge-tracker.mjs for the full note.
+// NOTE: several inputs below (cv.md, modes/, batch/, article-digest.md) are career-ops PROTOTYPE artefacts
+// that do NOT exist in GARY — this engine is a candidate for the "prune ported extras" pass (CLAUDE.md).
+const projectRoot = resolve(__dirname, '..');
 
 const warnings = [];
 const errors = [];
