@@ -6,7 +6,9 @@ import { resolve, dirname, basename, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_PATH = resolve(__dirname, 'templates', 'cv-template.tex');
+// `engines/../templates/`, NOT `engines/templates/` — the template lives at the PROJECT ROOT (ported from
+// career-ops, where this script sat at the repo root). See merge-tracker.mjs for the full note.
+const TEMPLATE_PATH = resolve(__dirname, '..', 'templates', 'cv-template.tex');
 const PLACEHOLDER_RE = /\{\{[A-Z_]+\}\}/g;
 
 function escapeLatex(text, mode = 'text') {

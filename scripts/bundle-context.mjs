@@ -22,12 +22,15 @@ const SKILLS = [
   'chrome-autoapply', 'easyapply-autofill', 'website-analyzer',
 ];
 
-// Files/dirs to skip anywhere in a recursive copy (PII / runtime caches).
-const DENY = [
-  'gmail-harvest',            // engines/gmail-harvest/* — real inbox harvest
+// Dirs to skip anywhere in a recursive copy (PII / runtime caches). Se comparan por SEGMENTO de ruta,
+// no por substring: `engines/gmail-harvest/` (la caché real del inbox) se excluye, pero el ENGINE
+// `engines/gmail-harvest.mjs` NO — con `includes()` el filtro se lo comía y el engine no viajaba en el
+// instalador, así que `source-gmail` moría en la app empaquetada (mismo fallo que playwright/js-yaml).
+const DENY_DIRS = [
+  'gmail-harvest',           // engines/gmail-harvest/ — real inbox harvest (el .mjs hermano SÍ se copia)
   'ats-session',             // per-session RAG clone
 ];
-const filter = (src) => !DENY.some((d) => src.includes(`${d}`));
+const filter = (src) => !src.split(/[\\/]/).some((seg) => DENY_DIRS.includes(seg));
 
 function copyFile(rel) {
   const from = join(root, rel);

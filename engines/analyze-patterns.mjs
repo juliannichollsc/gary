@@ -13,11 +13,13 @@
  */
 
 import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { load as yamlLoad } from 'js-yaml';
 
-const CAREER_OPS = dirname(fileURLToPath(import.meta.url));
+// PROJECT ROOT — `engines/..`, NOT `engines/` (ported from career-ops, where these scripts sat at the repo
+// root). See merge-tracker.mjs for the full note.
+const CAREER_OPS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const APPS_FILE = existsSync(join(CAREER_OPS, 'data/applications.md'))
   ? join(CAREER_OPS, 'data/applications.md')
   : join(CAREER_OPS, 'applications.md');

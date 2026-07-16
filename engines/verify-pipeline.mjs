@@ -15,10 +15,13 @@
  */
 
 import { readFileSync, readdirSync, existsSync, mkdirSync, unlinkSync, statSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
-const CAREER_OPS = dirname(fileURLToPath(import.meta.url));
+// PROJECT ROOT — `engines/..`, NOT `engines/` (ported from the career-ops prototype, where these scripts
+// sat at the repo root). Pointing it at `engines/` made this engine miss `data/applications.md` and
+// `templates/states.yml` entirely. See merge-tracker.mjs for the full note.
+const CAREER_OPS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Support both layouts: data/applications.md (boilerplate) and applications.md (original).
 // CAREER_OPS_TRACKER overrides the path (used by tests and non-standard layouts).
 const APPS_FILE = process.env.CAREER_OPS_TRACKER

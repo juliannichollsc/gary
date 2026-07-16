@@ -23,7 +23,12 @@ import { tmpdir } from 'os';
 import { normalizeReportLink as normalizeLink } from './tracker-links.mjs';
 import { roleFuzzyMatch } from './role-matcher.mjs';
 
-const CAREER_OPS = dirname(fileURLToPath(import.meta.url));
+// PROJECT ROOT — `engines/..`, NOT `engines/`. In the career-ops prototype these scripts lived at the repo
+// root, so `dirname(import.meta.url)` WAS the root; after porting them into `engines/` it silently became
+// `engines/`, so this engine was creating a PHANTOM `engines/data/applications.md` and ignoring the real
+// tracker at `data/applications.md`. Same idiom as cv-builder.mjs (resolve(__dirname, '..')) — file-relative,
+// so it holds whatever the CWD is.
+const CAREER_OPS = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Support both layouts: data/applications.md (boilerplate) and applications.md (original).
 // CAREER_OPS_TRACKER overrides the path (used by tests and non-standard layouts).
 const APPS_FILE_RAW = process.env.CAREER_OPS_TRACKER
@@ -790,7 +795,8 @@ trackerLock.release();
 if (VERIFY && !DRY_RUN) {
   console.log('\n--- Running verification ---');
   try {
-    execFileSync('node', [join(CAREER_OPS, 'verify-pipeline.mjs')], { stdio: 'inherit' });
+    // CAREER_OPS is the PROJECT ROOT — the sibling engine lives under `engines/`, not at the root.
+    execFileSync('node', [join(CAREER_OPS, 'engines', 'verify-pipeline.mjs')], { stdio: 'inherit' });
   } catch (e) {
     process.exit(1);
   }

@@ -9,8 +9,8 @@
 // and writes them to output/gmail-harvest/offers-<date>.json + pipeline-ready
 // lines. It NEVER applies — it only feeds the per-offer workflow.
 //
-// Prereq:  run  output\start-chrome-debug.cmd  first (Chrome on port 9333, automation profile).
-// Usage:
+// Prereq:  run  engines/start-chrome-debug.cmd  first (Chrome on port 9333, automation profile).
+// Usage (ALWAYS with CWD = project root — the output path below is relative to it):
 //   node engines/gmail-harvest.mjs                       # default filter, last 3 days
 //   node engines/gmail-harvest.mjs --days 7              # widen the window
 //   node engines/gmail-harvest.mjs --u 1                 # Gmail account index (if not u/0)
@@ -18,10 +18,13 @@
 //   node engines/gmail-harvest.mjs --query 'from:linkedin newer_than:2d'   # full override
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+// Harvest output dir — relative to CWD (= project root), NOT to this file. `linkedin-scan.mjs` hardcodes
+// the same 'output/gmail-harvest' (see its mkdirSync/--seen/--out) and reads our offers-<date>.json via
+// `--urls`, so writing anywhere else silently breaks the Gmail → LinkedIn handoff. `output/` is gitignored:
+// this harvest carries the user's real inbox URLs and must never be committed nor bundled in the installer.
+const OUT_DIR = 'output/gmail-harvest';
+
 const arg = (flag, def) => {
   const i = process.argv.indexOf(flag);
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : def;
@@ -136,15 +139,14 @@ for (let i = 0; i < limit; i++) {
 
 // Output.
 const stamp = new Date().toISOString().slice(0, 10);
-const outDir = `${HERE}/gmail-harvest`;
-mkdirSync(outDir, { recursive: true });
-const outFile = `${outDir}/offers-${stamp}.json`;
+mkdirSync(OUT_DIR, { recursive: true });
+const outFile = `${OUT_DIR}/offers-${stamp}.json`;
 writeFileSync(outFile, JSON.stringify({ harvestedAt: new Date().toISOString(), query, count: offers.length, offers }, null, 2));
 
 console.log(`\n=== ${offers.length} unique offer links harvested ===`);
 for (const o of offers) console.log(`  ${o.url}\n    └ via ${o.source} — "${o.emailSubject.slice(0, 60)}"`);
-console.log(`\nSaved → output/gmail-harvest/offers-${stamp}.json`);
-console.log(`Pipeline-ready URLs (paste into data/pipeline.md, one per line):`);
-for (const o of offers) console.log(o.url);
+console.log(`\nSaved → ${outFile}`);
+// Next hop (skill source-gmail §4): route the LinkedIn URLs through the CDP bot, not WebFetch.
+console.log(`Next: node engines/linkedin-scan.mjs --urls ${outFile}`);
 
 await browser.close(); // detaches CDP only; the automation browser stays open
