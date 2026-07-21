@@ -33,6 +33,42 @@ Não é desenvolvedor? Você não compila nada. Acesse a **[página de Releases]
 
 ---
 
+## 🎬 Tour guiado — como o GARY funciona
+
+É o mesmo passo a passo que o app mostra no botão **Tutorial**, no canto superior direito. As capturas são da interface em espanhol; o app vem em 5 idiomas.
+
+### 1. Conecte suas fontes
+Gmail, LinkedIn, Indeed, GetOnBoard, Himalayas, Computrabajo… Você faz login **uma vez** no navegador de automação isolado do GARY (nunca o seu pessoal). O GARY só usa as sessões que **você** logou e verificou aqui.
+
+<p align="center"><img src="docs/assets/screenshots/connections.png" alt="Painel de conexões" width="280"></p>
+
+### 2. Onboarding — você dá o seu contexto (uma única vez)
+Envia seu CV → o GARY o ingere no seu notebook do NotebookLM → ele faz as poucas perguntas que toda candidatura repete (localização, modalidade, salário desejado, contato). Daí em diante essas respostas são reutilizadas sozinhas, e qualquer pergunta *nova* de um site é feita uma vez no chat e lembrada para sempre.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-questions.png" alt="Onboarding — perguntas típicas" width="620"></p>
+
+### 3. Seu mapa de papéis
+O GARY lê seu CV e deriva as **famílias de cargos** às quais você realmente pode se candidatar, com a stack de cada uma. Você pode adicionar ou remover qualquer tag — é esse mapa que depois pontua cada vaga.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-role-map.png" alt="Onboarding — mapa de papéis" width="820"></p>
+
+### 4. O mapa de vagas — o coração do GARY
+Você pede uma busca no chat e o GARY varre todas as fontes conectadas, lê a **descrição real** de cada vaga e deixa aqui só as sobreviventes: empresa, cargo, canal, um **score de aderência 0–5**, status e *por que* encaixa (região, stack, remuneração, red flags). Filtre por fonte, por status ou por score mínimo. **Preparar candidatura** leva até o último passo — e para: o aviso *"GARY no envía — el click final es tuyo"* está sempre lá.
+
+<p align="center"><img src="docs/assets/screenshots/offers-map.png" alt="Mapa de vagas" width="900"></p>
+
+### 5. Métricas
+Cada hunt fica registrado: modelo usado, tokens gastos, quantas vagas foram encontradas versus quantas eram **de fato** para o seu perfil, e de qual fonte vieram — para você ver quais portais valem seu tempo.
+
+<p align="center"><img src="docs/assets/screenshots/metrics.png" alt="Métricas" width="900"></p>
+
+### 6. Configurações
+Atualize seu CV (ele é re-ingerido no NotebookLM), inicie/pare o navegador de automação, ajuste quantas fontes rodam em paralelo conforme sua máquina e troque o idioma da interface.
+
+<p align="center"><img src="docs/assets/screenshots/settings.png" alt="Configurações" width="900"></p>
+
+---
+
 ## Para desenvolvedores
 
 O GARY é um **app de desktop (Tauri + Rust)** que coloca um chat amigável na frente de um agente de IA de nível terminal. Você digita; nos bastidores, o GARY conduz a CLI de IA que você escolher (Gemini / Claude / OpenCode), que carrega as skills + engines do GARY para: buscar vagas em vários portais, validar o encaixe lendo a descrição real, personalizar seu CV por cargo e preparar as candidaturas — **parando antes de enviar** (o clique continua sendo humano).

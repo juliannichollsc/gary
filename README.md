@@ -33,6 +33,42 @@ Not a developer? You don't build anything. Go to the **[Releases page](https://g
 
 ---
 
+## 🎬 A guided tour — how GARY works
+
+This is the same walkthrough the app shows you under the **Tutorial** button in the top-right corner. Screenshots are from the Spanish UI; the app ships in 5 languages.
+
+### 1. Connect your sources
+Gmail, LinkedIn, Indeed, GetOnBoard, Himalayas, Computrabajo… You sign in **once** in GARY's own isolated automation browser (never your personal one). GARY only ever uses the sessions **you** logged in and verified here.
+
+<p align="center"><img src="docs/assets/screenshots/connections.png" alt="Connections panel" width="280"></p>
+
+### 2. Onboarding — give GARY your context (once)
+Upload your CV → GARY ingests it into your NotebookLM notebook → it asks the handful of questions every application repeats (location, work mode, expected salary, contact details). From then on those answers are reused automatically, and any *new* question a site asks is asked once in the chat and remembered forever.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-questions.png" alt="Onboarding — typical questions" width="620"></p>
+
+### 3. Your role map
+GARY reads your CV and derives the **role families** you can realistically apply to, with the stack behind each one. You can add or remove any tag — this map is what scores every offer later.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-role-map.png" alt="Onboarding — role map" width="820"></p>
+
+### 4. The offers map — the heart of GARY
+Ask for a hunt in the chat and GARY sweeps every connected source, reads the **real job description** of each opening, and drops only the survivors here: company, role, channel, a **0–5 fit score**, status, and *why* it fits (region, stack, comp, red flags). Filter by source, by status, or by minimum score. **Prepare application** takes it to the final step — and stops: the banner *"GARY no envía — el click final es tuyo"* is always there.
+
+<p align="center"><img src="docs/assets/screenshots/offers-map.png" alt="Offers map" width="900"></p>
+
+### 5. Metrics
+Every hunt is logged: model used, tokens spent, how many offers were found vs. how many were **really** a fit, and which source produced them — so you can see which boards are actually worth your time.
+
+<p align="center"><img src="docs/assets/screenshots/metrics.png" alt="Metrics" width="900"></p>
+
+### 6. Settings
+Update your CV (it re-ingests into NotebookLM), start/stop the automation browser, tune how many sources run in parallel for your machine, and switch the interface language.
+
+<p align="center"><img src="docs/assets/screenshots/settings.png" alt="Settings" width="900"></p>
+
+---
+
 ## For developers
 
 GARY is a **desktop app (Tauri + Rust)** that puts a friendly chat in front of a terminal-grade AI agent. You type; under the hood it drives your chosen AI coding CLI (Gemini / Claude / OpenCode) which loads GARY's skills + engines to: source offers across boards, validate fit by reading the real JD, tailor your CV per role, and prepare applications — **stopping before submit** (the click stays human).

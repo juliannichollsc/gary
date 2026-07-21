@@ -33,6 +33,42 @@
 
 ---
 
+## 🎬 图解导览 —— GARY 是怎么工作的
+
+这与应用内右上角 **Tutorial（教程）** 按钮展示的流程一致。截图取自西班牙语界面；应用共支持 5 种语言。
+
+### 1. 连接你的来源
+Gmail、LinkedIn、Indeed、GetOnBoard、Himalayas、Computrabajo…… 你只需在 GARY 独立隔离的自动化浏览器中登录**一次**（绝不使用你的个人浏览器）。GARY 只会使用**你**在这里登录并验证过的会话。
+
+<p align="center"><img src="docs/assets/screenshots/connections.png" alt="连接面板" width="280"></p>
+
+### 2. 引导设置 —— 一次性告诉 GARY 你的背景
+上传简历 → GARY 将其导入你的 NotebookLM 笔记本 → 它会问几个每份申请都会重复的问题（所在地、工作模式、期望薪资、联系方式）。此后这些答案会被自动复用；任何网站提出的*新*问题只会在聊天里问你一次，并被永久记住。
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-questions.png" alt="引导设置 —— 常见问题" width="620"></p>
+
+### 3. 你的角色地图
+GARY 读取你的简历，推导出你真正能投递的**角色族**以及每个角色背后的技术栈。你可以随意增删标签 —— 后续每个职位的评分正是基于这张地图。
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-role-map.png" alt="引导设置 —— 角色地图" width="820"></p>
+
+### 4. 职位地图 —— GARY 的核心
+你在聊天里发起一次搜索，GARY 会扫描所有已连接的来源，读取每个职位的**真实职位描述**，只把通过筛选的留在这里：公司、职位、渠道、**0–5 匹配分**、状态，以及*为什么*匹配（地区、技术栈、薪资、风险信号）。可按来源、状态或最低分筛选。**准备申请**会把流程推进到最后一步 —— 然后停下：*"GARY no envía — el click final es tuyo"*（GARY 不会提交，最后一次点击属于你）的提示始终在那里。
+
+<p align="center"><img src="docs/assets/screenshots/offers-map.png" alt="职位地图" width="900"></p>
+
+### 5. 指标
+每一次搜索都会被记录：所用模型、消耗的 tokens、找到多少职位与其中**真正**符合你画像的有多少，以及它们来自哪个来源 —— 让你看清哪些平台值得投入时间。
+
+<p align="center"><img src="docs/assets/screenshots/metrics.png" alt="指标" width="900"></p>
+
+### 6. 设置
+更新简历（会重新导入 NotebookLM）、启动/停止自动化浏览器、根据你的机器调整并行运行的来源数量，以及切换界面语言。
+
+<p align="center"><img src="docs/assets/screenshots/settings.png" alt="设置" width="900"></p>
+
+---
+
 ## 面向开发者
 
 GARY 是一款 **桌面应用（Tauri + Rust）**，在一个友好的聊天界面背后接入了终端级的 AI 智能体。你输入内容；在底层，GARY 驱动你选择的 AI CLI（Gemini / Claude / OpenCode），它加载 GARY 的 skills + engines 来：在多个招聘网站上搜寻职位、通过阅读真实描述验证契合度、按角色定制你的简历，并准备好申请 —— **在提交前停下**（点击仍由人来完成）。

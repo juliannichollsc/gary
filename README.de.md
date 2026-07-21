@@ -33,6 +33,42 @@ Kein Entwickler? Du baust nichts. Geh zur **[Releases-Seite](https://github.com/
 
 ---
 
+## 🎬 Geführte Tour — so funktioniert GARY
+
+Das ist derselbe Rundgang, den die App über den **Tutorial**-Button oben rechts zeigt. Die Screenshots stammen aus der spanischen Oberfläche; die App gibt es in 5 Sprachen.
+
+### 1. Verbinde deine Quellen
+Gmail, LinkedIn, Indeed, GetOnBoard, Himalayas, Computrabajo… Du meldest dich **einmal** in GARYs eigenem, isoliertem Automatisierungs-Browser an (nie in deinem persönlichen). GARY nutzt ausschließlich die Sitzungen, die **du** hier angemeldet und verifiziert hast.
+
+<p align="center"><img src="docs/assets/screenshots/connections.png" alt="Verbindungen" width="280"></p>
+
+### 2. Onboarding — du gibst GARY deinen Kontext (einmalig)
+CV hochladen → GARY übernimmt ihn in dein NotebookLM-Notebook → es stellt die wenigen Fragen, die jede Bewerbung wiederholt (Ort, Arbeitsmodell, Gehaltsvorstellung, Kontaktdaten). Ab da werden diese Antworten automatisch wiederverwendet, und jede *neue* Frage einer Website wird einmal im Chat gestellt und dauerhaft gemerkt.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-questions.png" alt="Onboarding — typische Fragen" width="620"></p>
+
+### 3. Deine Rollen-Map
+GARY liest deinen CV und leitet die **Rollenfamilien** ab, auf die du dich realistisch bewerben kannst — samt Stack je Familie. Du kannst jedes Tag hinzufügen oder entfernen — diese Map bewertet später jedes Angebot.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-role-map.png" alt="Onboarding — Rollen-Map" width="820"></p>
+
+### 4. Die Angebotskarte — das Herz von GARY
+Du bittest im Chat um eine Suche, GARY durchkämmt alle verbundenen Quellen, liest die **echte Stellenbeschreibung** jeder Ausschreibung und legt nur die Überlebenden hier ab: Unternehmen, Rolle, Kanal, ein **Fit-Score 0–5**, Status und *warum* es passt (Region, Stack, Vergütung, Red Flags). Filtere nach Quelle, Status oder Mindest-Score. **Bewerbung vorbereiten** führt bis zum letzten Schritt — und stoppt: der Hinweis *„GARY no envía — el click final es tuyo"* ist immer sichtbar.
+
+<p align="center"><img src="docs/assets/screenshots/offers-map.png" alt="Angebotskarte" width="900"></p>
+
+### 5. Metriken
+Jeder Hunt wird protokolliert: verwendetes Modell, verbrauchte Tokens, wie viele Angebote gefunden wurden gegenüber wie vielen **wirklich** zu deinem Profil passten, und aus welcher Quelle sie kamen — damit du siehst, welche Portale deine Zeit wert sind.
+
+<p align="center"><img src="docs/assets/screenshots/metrics.png" alt="Metriken" width="900"></p>
+
+### 6. Einstellungen
+CV aktualisieren (wird erneut in NotebookLM übernommen), Automatisierungs-Browser starten/stoppen, einstellen wie viele Quellen für deine Maschine parallel laufen, und die Sprache der Oberfläche wechseln.
+
+<p align="center"><img src="docs/assets/screenshots/settings.png" alt="Einstellungen" width="900"></p>
+
+---
+
 ## Für Entwickler
 
 GARY ist eine **Desktop-App (Tauri + Rust)**, die einen freundlichen Chat vor einen terminalstarken KI-Agenten setzt. Du tippst; im Hintergrund steuert GARY die von dir gewählte KI-CLI (Gemini / Claude / OpenCode), die GARYs Skills + Engines lädt, um: Angebote über mehrere Börsen zu finden, die Passung durch Lesen der echten Beschreibung zu prüfen, deinen Lebenslauf pro Rolle anzupassen und Bewerbungen vorzubereiten — **stoppt vor dem Absenden** (der Klick bleibt menschlich).

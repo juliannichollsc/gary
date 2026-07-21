@@ -33,6 +33,42 @@ Conversas con GARY en lenguaje natural, y él trabaja en silencio en segundo pla
 
 ---
 
+## 🎬 Recorrido guiado — cómo funciona GARY
+
+Es el mismo recorrido que la app te muestra con el botón **Tutorial** arriba a la derecha. Las capturas son de la interfaz en español; la app viene en 5 idiomas.
+
+### 1. Conecta tus fuentes
+Gmail, LinkedIn, Indeed, GetOnBoard, Himalayas, Computrabajo… Inicias sesión **una vez** en el navegador de automatización aislado de GARY (nunca el personal). GARY solo usa las sesiones que **tú** iniciaste y verificaste aquí.
+
+<p align="center"><img src="docs/assets/screenshots/connections.png" alt="Panel de conexiones" width="280"></p>
+
+### 2. Onboarding — le das tu contexto (una sola vez)
+Subes tu CV → GARY lo ingesta en tu notebook de NotebookLM → te hace las pocas preguntas que toda postulación repite (ubicación, modalidad, salario esperado, datos de contacto). A partir de ahí esas respuestas se reutilizan solas, y cualquier pregunta *nueva* de un sitio te la hace una vez en el chat y la recuerda para siempre.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-questions.png" alt="Onboarding — preguntas típicas" width="620"></p>
+
+### 3. Tu mapa de roles
+GARY lee tu CV y deriva las **familias de roles** a las que puedes postularte de verdad, con el stack detrás de cada una. Puedes añadir o quitar cualquier tag — este mapa es el que después puntúa cada oferta.
+
+<p align="center"><img src="docs/assets/screenshots/onboarding-role-map.png" alt="Onboarding — mapa de roles" width="820"></p>
+
+### 4. El mapa de ofertas — el corazón de GARY
+Pides una búsqueda en el chat y GARY barre todas las fuentes conectadas, lee la **descripción real** de cada vacante y deja aquí solo las que sobreviven: empresa, rol, canal, un **score de encaje 0–5**, estado y *por qué* encaja (región, stack, comp, red flags). Filtras por fuente, por estado o por score mínimo. **Preparar aplicación** la lleva hasta el último paso — y se detiene: el aviso *"GARY no envía — el click final es tuyo"* siempre está ahí.
+
+<p align="center"><img src="docs/assets/screenshots/offers-map.png" alt="Mapa de ofertas" width="900"></p>
+
+### 5. Métricas
+Cada hunt queda registrado: modelo usado, tokens gastados, cuántas ofertas se encontraron frente a cuántas eran **realmente** para tu perfil, y de qué fuente salieron — para que veas qué portales valen tu tiempo.
+
+<p align="center"><img src="docs/assets/screenshots/metrics.png" alt="Métricas" width="900"></p>
+
+### 6. Ajustes
+Actualizas tu CV (se re-ingesta en NotebookLM), inicias/detienes el navegador de automatización, ajustas cuántas fuentes corren en paralelo según tu máquina y cambias el idioma de la interfaz.
+
+<p align="center"><img src="docs/assets/screenshots/settings.png" alt="Ajustes" width="900"></p>
+
+---
+
 ## Para desarrolladores
 
 GARY es una **app de escritorio (Tauri + Rust)** que pone un chat amigable delante de un agente de IA de nivel terminal. Tú escribes; por debajo, GARY conduce la CLI de IA que elijas (Gemini / Claude / OpenCode), que carga las skills + engines de GARY para: buscar ofertas en varios portales, validar el encaje leyendo la descripción real, adaptar tu CV por rol y preparar las postulaciones — **deteniéndose antes de enviar** (el clic sigue siendo humano).
