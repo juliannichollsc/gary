@@ -1,7 +1,9 @@
 import { formatCookieHeader } from './cookie-store.js';
+import { apiUrl, getApiOrigin, notebookUrl } from './host.js';
 import type { LogFn } from './types.js';
 
-const QUERY_URL = 'https://notebooklm.google.com/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1.LabsTailwindOrchestrationService/GenerateFreeFormStreamed';
+// Host resolved at runtime (notebooklm.google.com → notebook.google.com after the Gemini migration).
+const QUERY_PATH = '/_/LabsTailwindUi/data/google.internal.labs.tailwind.orchestration.v1.LabsTailwindOrchestrationService/GenerateFreeFormStreamed';
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 // ---------------------------------------------------------------------------
@@ -226,7 +228,7 @@ export async function chat(options: ChatOptions): Promise<ChatResponse> {
   if (csrfToken) body.set('at', csrfToken);
 
   // 3. Build URL with query params
-  const url = new URL(QUERY_URL);
+  const url = new URL(apiUrl(QUERY_PATH));
   url.searchParams.set('hl', 'en');
   url.searchParams.set('_reqid', '100000');
   url.searchParams.set('rt', 'c');
@@ -242,8 +244,8 @@ export async function chat(options: ChatOptions): Promise<ChatResponse> {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       'Cookie': cookieHeader,
       'User-Agent': USER_AGENT,
-      'origin': 'https://notebooklm.google.com',
-      'referer': `https://notebooklm.google.com/notebook/${notebookId}`,
+      'origin': getApiOrigin(),
+      'referer': notebookUrl(notebookId),
       'x-same-domain': '1',
     },
     body: body.toString(),

@@ -7,9 +7,13 @@ import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 
 import { formatCookieHeader } from './cookie-store.js';
+import { DEFAULT_ORIGIN, apiUrl, getApiOrigin, setApiOriginFromUrl } from './host.js';
 
-const BATCHEXECUTE_URL = 'https://notebooklm.google.com/_/LabsTailwindUi/data/batchexecute';
-const NOTEBOOKLM_URL = 'https://notebooklm.google.com/';
+// NotebookLM moved to the Gemini-era host (notebook.google.com). Do NOT hardcode it: `init()` follows
+// the redirect chain and pins the origin the app actually landed on (see host.ts). Posting an RPC to
+// the old origin returns 401 even though the page HTML loads fine.
+const BATCHEXECUTE_PATH = '/_/LabsTailwindUi/data/batchexecute';
+const NOTEBOOKLM_URL = `${DEFAULT_ORIGIN}/`;
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -36,6 +40,12 @@ function applySetCookies(res: Response, cookieMap: Record<string, string>): void
     const value = first.slice(idx + 1).trim();
     if (name) cookieMap[name] = value;
   }
+}
+
+/** Tags a response with the URL of the hop that produced it (`res.url` is empty on manual redirects). */
+function withFinalUrl(res: Response, url: string): Response {
+  try { (res as Response & { finalUrl?: string }).finalUrl = url; } catch { /* ignore */ }
+  return res;
 }
 
 /**
@@ -71,12 +81,14 @@ async function fetchWithCookieJar(
 
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get('location');
-      if (!location) return res;
+      if (!location) return withFinalUrl(res, current);
       current = new URL(location, current).toString();
       continue;
     }
 
-    return res;
+    // Stamp the URL of the LAST hop: it tells us which host actually serves the app now
+    // (notebooklm.google.com → notebook.google.com after the Gemini migration).
+    return withFinalUrl(res, current);
   }
 
   throw new Error(`Too many redirects while fetching ${url} (>${maxRedirects}).`);
@@ -156,6 +168,7 @@ export class RPCClient {
   private cookieMap: Record<string, string>;
   private csrfToken = ''; // SNlM0e
   private sessionId = ''; // FdrFJe
+  private accountEmail = ''; // whose NotebookLM we're actually talking to (see init())
   private reqCounter = 100000;
 
   constructor(cookieMap: Record<string, string>) {
@@ -170,6 +183,17 @@ export class RPCClient {
   /** Returns the session ID extracted during init(). */
   getSessionId(): string {
     return this.sessionId;
+  }
+
+  /**
+   * The Google account this session actually belongs to (extracted from the app page during init()).
+   * A browser signed into SEVERAL Google accounts can hand us a different one than the account that owns
+   * the candidate's notebook — and then every `notebooks exists` says false and GARY would happily create
+   * a duplicate notebook in the wrong account. Surfacing it lets callers warn instead of guessing.
+   * Empty string when the page didn't carry it.
+   */
+  getAccountEmail(): string {
+    return this.accountEmail;
   }
 
   /** Returns the cookie map used by this client. */
@@ -201,6 +225,11 @@ export class RPCClient {
       throw new Error(`Failed to load NotebookLM page: ${res.status} ${res.statusText}`);
     }
 
+    // Pin the host the app REALLY lives on before issuing any RPC. Google redirects
+    // notebooklm.google.com → notebook.google.com (Gemini migration) and only the landing host
+    // accepts batchexecute calls; the other answers 401 with a perfectly valid session.
+    setApiOriginFromUrl((res as Response & { finalUrl?: string }).finalUrl || res.url);
+
     const html = await res.text();
 
     // Check if we got a login page instead of the app
@@ -221,6 +250,9 @@ export class RPCClient {
       );
     }
     this.csrfToken = snlm0eMatch[1];
+
+    // Whose account is this? (first mail address the app page carries — best effort, never fatal)
+    this.accountEmail = (html.match(/[\w.+-]+@(?:gmail\.com|googlemail\.com)/) || [''])[0];
 
     // Extract FdrFJe (session ID)
     const fdrfjeMatch = html.match(/"FdrFJe"\s*:\s*"([^"]+)"/);
@@ -247,7 +279,7 @@ export class RPCClient {
       at: this.csrfToken,
     });
 
-    const url = new URL(BATCHEXECUTE_URL);
+    const url = new URL(apiUrl(BATCHEXECUTE_PATH));
     url.searchParams.set('rpcids', rpcId);
     url.searchParams.set('source-path', sourcePath || '/');
     url.searchParams.set('f.sid', this.sessionId);
@@ -261,8 +293,8 @@ export class RPCClient {
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
         'Cookie': formatCookieHeader(this.cookieMap),
         'User-Agent': USER_AGENT,
-        'origin': 'https://notebooklm.google.com',
-        'referer': 'https://notebooklm.google.com/',
+        'origin': getApiOrigin(),
+        'referer': `${getApiOrigin()}/`,
         'x-same-domain': '1',
       },
       body: body.toString(),
@@ -270,8 +302,15 @@ export class RPCClient {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
+      // 401 here = the session is valid but was posted to the wrong host (the classic symptom of the
+      // NotebookLM → Gemini move) or the cookies expired. Say so instead of a bare status code.
+      const hint =
+        response.status === 401
+          ? ` — NotebookLM rejected the session on ${getApiOrigin()}. If Google moved the app again, re-run` +
+            ' the command (the host is resolved on init); otherwise run "login --force".'
+          : '';
       throw new Error(
-        `RPC ${rpcId} failed: ${response.status} ${response.statusText}` +
+        `RPC ${rpcId} failed: ${response.status} ${response.statusText}${hint}` +
           (text ? `\n${text.slice(0, 500)}` : ''),
       );
     }
@@ -293,7 +332,7 @@ export class RPCClient {
     // Strategy 1: Simple fetch with redirect: 'follow' (works for static images like infographics)
     try {
       const simpleRes = await fetch(url, {
-        headers: { 'User-Agent': USER_AGENT, 'Referer': 'https://notebooklm.google.com/' },
+        headers: { 'User-Agent': USER_AGENT, 'Referer': `${getApiOrigin()}/` },
         redirect: 'follow',
       });
       const ct = simpleRes.headers.get('content-type') ?? '';
@@ -324,7 +363,7 @@ export class RPCClient {
               headers: {
                 'Cookie': googleCookieHeader,
                 'User-Agent': USER_AGENT,
-                'Referer': 'https://notebooklm.google.com/',
+                'Referer': `${getApiOrigin()}/`,
               },
             },
             (res) => {

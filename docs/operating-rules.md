@@ -66,6 +66,15 @@ Apply every offer through this gate during triage; an offer must pass ALL of it.
 > informational, never a drop/down-score) and there is **NO dedup by company** (multiple roles per company all
 > stay; dedup only by exact offer/URL). Any older "reject below floor" / "one app per company" text in a board
 > skill is DEPRECATED — those behaviors are DATA-driven, not baked into the methodology.
+- **MODALITY is meaningless without the CITY — always resolve it against `## Preferencias de aplicación` →
+  `Ubicación` (DATA).** The onboarding answer is stored as-is, but the FILTER is the derived pair (the generated
+  `gary-context.md` now spells this out under "Reglas de modalidad", so don't re-infer it):
+  **presencial/híbrido ⇒ ONLY the candidate's current city** (or its metro area) — the same modality in another
+  city is a reject unless the candidate declared a relocation/sponsorship condition; **remoto ⇒ the city does NOT
+  restrict** — it accepts remote offers from that city/country **plus** the remote regions we already use
+  (remote-worldwide, LATAM incl. the country, Américas, bare "remote"), still under region-lock §1.
+  A candidate who picked several modalities gets the UNION of those rules (mirrors the `workType`+`locations`
+  mapping in §4's `easyapply-filter.json`).
 - **MODALITY / location:** keep only remote-worldwide, remote-LATAM-that-includes the candidate's country, or on-site/hybrid **in the candidate's city**, **OR** roles that explicitly offer **visa sponsorship** (candidate has a passport, would relocate with sponsorship). **Region-locked otherwise (US/Canada/UK/EU/India/Brazil-only, E-Verify/work-auth, hybrid/on-site elsewhere) → DELETE the line from the master doc** (don't even keep it as a discard). Sponsorship is the only exception that survives.
 - **LANGUAGE:** Spanish or English only. If the JD / screening is in another language (Portuguese, French, German, …) → discard. (Candidate English level is DATA — if B2, reject roles that mandate C1/C2.)
 - **PROFILE fit:** match the candidate's real stack (`cv-data.md`). Reject: roles whose CORE is a gap skill (e.g. AWS/GCP/Kubernetes/Django as required/core), **backend-specialist** roles demanding more domain-backend years than the candidate has (total YOE ≠ domain YOE), and **non-engineering** roles — UI/UX or Product Designer, design-primary "Design Engineer" (Figma-heavy), QA/SDET, PM/Product, management/lead-only, pure data/ML. **An "AI tools / Claude Code" mention does NOT rescue a non-eng or gap-core role.**

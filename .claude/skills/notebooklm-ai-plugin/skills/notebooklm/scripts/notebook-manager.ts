@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { LibraryFile, NotebookInfo } from './types.js';
 import type { RPCClient } from './rpc-client.js';
+import { notebookUrl } from './host.js';
 import { RPC } from './rpc-types.js';
 import { resolveLibraryPath } from './paths.js';
 
@@ -27,7 +28,7 @@ export async function createNotebook(rpc: RPCClient, title: string): Promise<{ i
   };
   const id = (Array.isArray(response) && isUuid(response[2]) ? response[2] : null) ?? scan(response);
   if (!id) throw new Error('Could not extract the new notebook id from the CREATE_NOTEBOOK response.');
-  return { id, url: `https://notebooklm.google.com/notebook/${id}` };
+  return { id, url: notebookUrl(id) };
 }
 
 /**

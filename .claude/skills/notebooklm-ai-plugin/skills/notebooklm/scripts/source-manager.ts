@@ -224,7 +224,9 @@ export async function addSourceFile(
 
   // Step 2: Start a resumable upload session.
   // POST to the fixed upload endpoint with the source ID, notebook ID, and filename in a JSON body.
-  const UPLOAD_URL = 'https://notebooklm.google.com/upload/_/';
+  // Resolved host (notebook.google.com post-migration) — uploading to the old one 401s.
+  const { getApiOrigin, apiUrl } = await import('./host.js');
+  const UPLOAD_URL = apiUrl('/upload/_/');
   const { formatCookieHeader } = await import('./cookie-store.js');
   const cookieHeader = formatCookieHeader(cookieMap);
 
@@ -238,8 +240,8 @@ export async function addSourceFile(
       'x-goog-upload-header-content-length': String(fileSize),
       'x-goog-authuser': '0',
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'origin': 'https://notebooklm.google.com',
-      'referer': 'https://notebooklm.google.com/',
+      'origin': getApiOrigin(),
+      'referer': `${getApiOrigin()}/`,
     },
     body: JSON.stringify({
       PROJECT_ID: notebookId,
@@ -275,8 +277,8 @@ export async function addSourceFile(
       'x-goog-upload-offset': '0',
       'x-goog-authuser': '0',
       'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
-      'origin': 'https://notebooklm.google.com',
-      'referer': 'https://notebooklm.google.com/',
+      'origin': getApiOrigin(),
+      'referer': `${getApiOrigin()}/`,
     },
     body: fileBuffer,
   });

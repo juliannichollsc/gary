@@ -46,6 +46,7 @@ export type OnboardingState = {
   softSkills: string[];     // habilidades blandas del candidato
   profile: CandidateProfile;// preguntas típicas de aplicación
   notebookId?: string;
+  notebookAccount?: string; // cuenta de Google dueña del notebook (candado anti-duplicado entre cuentas)
   step?: number;            // paso actual del wizard (1..LAST) → retomar donde iba tras cerrar/reabrir
 };
 
@@ -67,7 +68,10 @@ export type IngestEvent =
   | { kind: "progress"; value: number }
   | { kind: "roles"; roles: RoleVariant[] }
   | { kind: "profile"; profile: Partial<CandidateProfile> } // datos extraídos del CV → autocompletan el paso 4
-  | { kind: "notebook"; id: string }  // ID del notebook de NotebookLM creado → para abrirlo desde Ajustes
+  // ID del notebook de NotebookLM creado/reusado → para abrirlo desde Ajustes. `account` = la cuenta de
+  // Google dueña de ese notebook: se persiste para no recrearlo por error cuando el navegador esté en OTRA
+  // cuenta (ahí "no existe" significa "no existe AQUÍ", no "lo borraron").
+  | { kind: "notebook"; id: string; account?: string }
   | { kind: "error"; message: string };
 
 const LS_KEY = "gary-onboarding";
@@ -132,6 +136,26 @@ export function buildContextMd(roles: RoleVariant[], softSkills: string[], profi
   const TODO_ROLES = "> _Pendiente: GARY (agente) debe mapear las familias de roles y su stack técnico leyendo el CV y este NotebookLM._";
   const TODO_TECH = "> _Pendiente: GARY debe extraer las skills técnicas del CV/NotebookLM._";
   const TODO_SOFT = "> _Pendiente: GARY debe extraer las soft skills del CV/NotebookLM — incluir ética de trabajo, liderazgo, comunicación, trabajo en equipo, adaptabilidad, etc._";
+  // La modalidad SOLA no dice cómo filtrar: hay que anclarla a la ciudad. Presencial/híbrido solo tienen
+  // sentido en la ciudad actual del candidato; remoto abre además las regiones remotas que ya usamos
+  // (region-lock §1). Se escribe EXPLÍCITO en el RAG para que el agente no lo tenga que inferir cada vez.
+  const city = profile.location || "(ciudad no indicada)";
+  const onsite = profile.modality.some((m) => m === "presencial" || m === "hibrido");
+  const remote = profile.modality.includes("remoto");
+  const modalityRules = [
+    "### Reglas de modalidad (derivadas — cómo se filtra por ubicación)",
+    onsite
+      ? `- **Presencial/híbrido → SIEMPRE anclados a ${city}.** Solo califican ofertas en esa ciudad o su área ` +
+        `metropolitana; presencial/híbrido en otra ciudad se descarta` +
+        (profile.modalityCondition ? ` salvo la condición declarada: ${profile.modalityCondition}.` : ".")
+      : "",
+    remote
+      ? `- **Remoto → la ciudad NO limita.** Califican tanto las ofertas remotas de ${city} y su país como las ` +
+        "regiones remotas que ya usamos: remote-worldwide, LATAM (incluido el país), Américas y \"remote\" a " +
+        "secas. Sigue aplicando el region-lock: se descartan US-only / EU-only / NA-only y presencial en el extranjero."
+      : "",
+    !onsite && !remote ? "> _Pendiente: el candidato aún no eligió modalidad en el onboarding._" : "",
+  ].filter(Boolean).join("\n");
   return [
     "# GARY — contexto del candidato",
     "",
@@ -148,6 +172,8 @@ export function buildContextMd(roles: RoleVariant[], softSkills: string[], profi
     `- Salario mínimo: ${profile.salaryMin || "—"} ${profile.currency || ""}`.trim(),
     `- Teléfono: ${profile.phone || "—"}`,
     `- Email: ${profile.email || "—"}`,
+    "",
+    modalityRules,
     links ? `\n### Enlaces de contacto/exposición\n${links}` : "",
   ].join("\n");
 }
@@ -196,6 +222,7 @@ export async function runIngest(
   emit: (e: IngestEvent) => void,
   signal?: AbortSignal,
   notebookId?: string, // si ya existe (reemplazo de CV) → el core reutiliza ese notebook en vez de crear
+  notebookAccount?: string, // cuenta dueña del notebook → el core no lo recrea si estás en otra cuenta
 ): Promise<void> {
   let unlisten: (() => void) | undefined;
   try {
@@ -211,7 +238,7 @@ export async function runIngest(
       // Ask the Rust core to drive the plugin. No backend (web mode, unregistered command, or the CV bytes
       // were never persisted so there's no path to add) → simulate.
       if (!file.path) { finish(false); return; }
-      tryInvoke<boolean>("start_ingest", { cvPath: file.path, notebookId }).then((started) => {
+      tryInvoke<boolean>("start_ingest", { cvPath: file.path, notebookId, notebookAccount }).then((started) => {
         if (!started) finish(false);
       });
     });

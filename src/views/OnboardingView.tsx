@@ -46,6 +46,7 @@ export function OnboardingView(
   const [softSkills, setSoftSkills] = useState<string[]>([]);
   const [profile, setProfile] = useState<CandidateProfile>(EMPTY_PROFILE);
   const [notebookId, setNotebookId] = useState<string | undefined>(undefined); // notebook de NotebookLM creado
+  const [notebookAccount, setNotebookAccount] = useState<string | undefined>(undefined); // su cuenta de Google
   const [nlmConn, setNlmConn] = useState<NlmConn>("unknown"); // sesión de NotebookLM (gate previo a la ingesta)
   const openedForStep2 = useRef(false); // evita relanzar/abrir el navegador cada vez que se re-renderiza el paso 2
   const abortRef = useRef<AbortController | null>(null);
@@ -57,6 +58,7 @@ export function OnboardingView(
       if (s.softSkills?.length) setSoftSkills(s.softSkills);
       if (s.profile) setProfile(s.profile);
       if (s.notebookId) setNotebookId(s.notebookId);
+      if (s.notebookAccount) setNotebookAccount(s.notebookAccount);
       // Origen SIDEBAR (resume) y el usuario YA tiene su notebook (CV ingestado) → saltar a Mapa de roles
       // (paso 4) para VER lo que mapeó el agente LM. Usamos `notebookId`, NO `done` (que solo se marca al
       // pulsar "Terminar"). "Actualizar CV" (Ajustes, resume=false) arranca en el paso 1 para correr el flujo
@@ -109,9 +111,9 @@ export function OnboardingView(
   const activeStep = tutorial && forceStep ? forceStep : step;
 
   // Persistencia parcial (mantiene todos los campos requeridos del estado). Incluye `step` para retomar.
-  const persist = (patch: Partial<{ roles: RoleVariant[]; softSkills: string[]; profile: CandidateProfile; notebookId: string; step: number }>) => {
+  const persist = (patch: Partial<{ roles: RoleVariant[]; softSkills: string[]; profile: CandidateProfile; notebookId: string; notebookAccount: string; step: number }>) => {
     if (!file) return;
-    saveOnboarding({ done: false, file, roles, softSkills, profile, notebookId, step, ...patch });
+    saveOnboarding({ done: false, file, roles, softSkills, profile, notebookId, notebookAccount, step, ...patch });
   };
 
   // Recordar el paso entre reinicios: si el usuario cierra el programa a mitad del onboarding, al reabrir
@@ -148,13 +150,16 @@ export function OnboardingView(
     setFile(null); setProgress(0); setLog([]); setRoles([]); setIngesting(false); setError(null);
   }
 
-  async function startIngest(f: CvFile) {
+  // `conn` se pasa EXPLÍCITO desde verifyNlm: al llamar justo después de setNlmConn("connected") el estado
+  // del closure sigue en "checking", y con el valor viejo el guard de abajo no se aplicaba → un CV sin path
+  // caía en la simulación y NUNCA se creaba el notebook real (parecía que "verificar sesión" no dispara nada).
+  async function startIngest(f: CvFile, conn: NlmConn = nlmConn) {
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
     // Anti-simulación engañosa: si NotebookLM está conectado (backend real) pero el CV no quedó en disco,
     // NO simulamos un "notebook creado" falso — avisamos para re-subir el CV (así el create real puede correr).
-    if (nlmConn === "connected" && !f.path) { setError(t("ob.nlm.nopath")); return; }
+    if (conn === "connected" && !f.path) { setError(t("ob.nlm.nopath")); return; }
     setIngesting(true); setError(null); setProgress(0); setLog([]); setRoles([]);
     const onEvent = (e: IngestEvent) => {
       if (ac.signal.aborted) return;
@@ -162,7 +167,13 @@ export function OnboardingView(
       else if (e.kind === "progress") setProgress(e.value);
       else if (e.kind === "roles") setRoles(e.roles);
       else if (e.kind === "profile") setProfile((p) => mergeProfile(p, e.profile)); // autocompleta desde el CV
-      else if (e.kind === "notebook") { setNotebookId(e.id); persist({ notebookId: e.id }); } // guarda el notebook creado
+      else if (e.kind === "notebook") {
+        // Guarda el notebook Y su cuenta: así un ingest posterior sabe distinguir "lo borraron" (recrear)
+        // de "el navegador está en otra cuenta" (no recrear → evita notebooks GARY duplicados por cuenta).
+        setNotebookId(e.id);
+        if (e.account) setNotebookAccount(e.account);
+        persist(e.account ? { notebookId: e.id, notebookAccount: e.account } : { notebookId: e.id });
+      }
       else if (e.kind === "error") {
         setError(e.message);
         // Un fallo de ingesta suele ser sesión no válida (Gmail ≠ NotebookLM): vuelve al gate para re-verificar
@@ -173,7 +184,7 @@ export function OnboardingView(
     // notebookId presente = reemplazo de CV → el core reutiliza el notebook en vez de crear uno nuevo.
     // El ingest determinista solo crea+indexa; NO detecta roles/skills (eso lo hace el agente LM luego).
     // Roles queda vacío a propósito → el paso 4 muestra el texto informativo. "Continuar" no depende de roles.
-    try { await runIngest(f, onEvent, ac.signal, notebookId || undefined); }
+    try { await runIngest(f, onEvent, ac.signal, notebookId || undefined, notebookAccount || undefined); }
     catch (err) { if (!ac.signal.aborted) setError(String(err)); }
     finally { if (!ac.signal.aborted) setIngesting(false); }
   }
@@ -193,7 +204,7 @@ export function OnboardingView(
     const timeout = new Promise<boolean>((r) => setTimeout(() => r(false), 6 * 60_000));
     const ok = await Promise.race([connectNotebooklm(), timeout]);
     setNlmConn(ok ? "connected" : "pending");
-    if (ok && file && !ingestDone && !ingesting) startIngest(file);
+    if (ok && file && !ingestDone && !ingesting) startIngest(file, "connected");
   }
 
   function goNext() {
@@ -209,7 +220,7 @@ export function OnboardingView(
   function goBack() { setStep((s) => Math.max(1, s - 1)); }
 
   async function finish() {
-    await saveOnboarding({ done: true, file, roles, softSkills, profile, notebookId });
+    await saveOnboarding({ done: true, file, roles, softSkills, profile, notebookId, notebookAccount });
     onDone?.(); // entra al Chat DE INMEDIATO — no bloquear en la ingesta de contexto
     // Ingesta de skills/roles/respuestas al MISMO notebook, en SEGUNDO PLANO (best-effort): spawnea el
     // plugin + RPC (puede tardar), así que no debe retrasar la entrada al chat ni colgar el botón "Terminar".

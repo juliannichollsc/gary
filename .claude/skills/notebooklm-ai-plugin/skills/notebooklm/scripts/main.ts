@@ -6,9 +6,11 @@ import { readFile } from 'node:fs/promises';
 
 import type { ArtifactConfig, ArtifactType } from './types.js';
 import { readCookieMapFromDisk, hasRequiredCookies, writeCookieMapToDisk } from './cookie-store.js';
+import { notebookUrl } from './host.js';
 import { resolveOutputDir } from './paths.js';
 import { RPCClient } from './rpc-client.js';
 import { RPC } from './rpc-types.js';
+import { assertSessionAuthorizes, probeSession } from './session.js';
 import { ArtifactGenerator } from './artifact-generator.js';
 import {
   addNotebook,
@@ -129,6 +131,30 @@ async function handleLogin(parsed: ParsedArgs): Promise<void> {
   const force = parsed.flags.force === true;
   const cookieString = parsed.flags.cookies as string | undefined;
 
+  // `login --check` — read-only probe of the SAVED session: does this Google account still have access to
+  // NotebookLM RIGHT NOW? Never opens a browser, never writes, never polls. Exit 0 = authorized, 1 = not.
+  // This is what GARY calls before the ingest so a dead session gets renewed instead of blowing up half-way
+  // through (a cookie file merely EXISTING proves nothing — see session.ts).
+  if (parsed.flags.check === true) {
+    const existing = await readCookieMapFromDisk();
+    let authorized = false;
+    let account = '';
+    if (hasRequiredCookies(existing)) {
+      try {
+        const probe = await probeSession(existing);
+        await writeCookieMapToDisk(probe.cookieMap); // keep the rotated __Secure-1PSIDTS for the next call
+        account = probe.account;
+        authorized = true;
+      } catch {
+        authorized = false;
+      }
+    }
+    if (parsed.flags.json === true) jsonOutput({ authorized, account });
+    else textOutput(authorized ? `Session authorized${account ? ` (${account})` : ''}.` : 'Session NOT authorized — sign in again.');
+    if (!authorized) process.exit(1);
+    return;
+  }
+
   // If user provides a cookie string directly, parse and save it
   if (cookieString) {
     const cookieMap: Record<string, string> = {};
@@ -139,24 +165,45 @@ async function handleLogin(parsed: ParsedArgs): Promise<void> {
         cookieMap[trimmed.slice(0, eqIdx).trim()] = trimmed.slice(eqIdx + 1).trim();
       }
     }
-    if (hasRequiredCookies(cookieMap)) {
-      await writeCookieMapToDisk(cookieMap, {
-        log: (msg: string) => textOutput(msg),
-      });
-      textOutput(`Cookies saved (${Object.keys(cookieMap).length} cookies parsed from string).`);
-    } else {
+    if (!hasRequiredCookies(cookieMap)) {
       errorOutput('Cookie string is missing required cookies (SID, __Secure-1PSID). Check your cookie export.');
       process.exit(1);
     }
+    // NEVER save a session we haven't proven. SID + __Secure-1PSID survive a dead session, so an
+    // unvalidated save silently replaces a good cookie file with a dead one and the failure only
+    // surfaces much later ("notebooks create" → "redirected to Google login"). Probe a real RPC first.
+    let validated: Record<string, string>;
+    try {
+      validated = await assertSessionAuthorizes(cookieMap);
+    } catch (err) {
+      errorOutput(
+        `Those cookies do not authenticate NotebookLM: ${err instanceof Error ? err.message : String(err)}\n` +
+          'Open NotebookLM in that browser and sign in (passing Google\'s account chooser), then verify again.',
+      );
+      process.exit(1);
+      return;
+    }
+    await writeCookieMapToDisk(validated, {
+      log: (msg: string) => textOutput(msg),
+    });
+    textOutput(`Cookies saved and validated (${Object.keys(validated).length} cookies).`);
     return;
   }
 
-  // Skip if already authenticated (unless --force)
+  // Skip if already authenticated (unless --force). "Authenticated" = the saved cookies actually drive
+  // an RPC — the old cookie-names-present check reported success on an expired session, so the ingest
+  // died later instead of re-logging in here.
   if (!force) {
     const existing = await readCookieMapFromDisk();
     if (hasRequiredCookies(existing)) {
-      textOutput('Already authenticated. Use --force to re-authenticate.');
-      return;
+      try {
+        const refreshed = await assertSessionAuthorizes(existing);
+        await writeCookieMapToDisk(refreshed); // persist the rotated __Secure-1PSIDTS
+        textOutput('Already authenticated. Use --force to re-authenticate.');
+        return;
+      } catch {
+        textOutput('Saved session no longer authenticates NotebookLM — signing in again…');
+      }
     }
   }
 
@@ -240,7 +287,7 @@ async function handleNotebooks(parsed: ParsedArgs): Promise<void> {
     const id = extractNotebookId(urlOrId);
     const name = (parsed.flags.name as string) ?? id;
     const description = parsed.flags.description as string | undefined;
-    const url = urlOrId.startsWith('http') ? urlOrId : `https://notebooklm.google.com/notebook/${id}`;
+    const url = urlOrId.startsWith('http') ? urlOrId : notebookUrl(id);
 
     await addNotebook({ id, name, url, description });
     textOutput(`Added notebook "${name}" (${id})`);
@@ -1167,6 +1214,8 @@ function printUsage(): void {
 
 Commands:
   login                    Authenticate with Google (opens Chrome)
+  login --check [--json]   Probe the SAVED session (no browser, no write); exit 1 if not authorized
+  login --cookies "<hdr>"  Save a cookie header from an already-logged-in browser (validated first)
   notebooks list           List saved notebooks
   notebooks add <url>      Add a notebook to library
   notebooks remove <id>    Remove a notebook

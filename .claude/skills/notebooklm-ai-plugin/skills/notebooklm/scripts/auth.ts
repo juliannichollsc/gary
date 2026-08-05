@@ -4,11 +4,14 @@ import { mkdir } from 'node:fs/promises';
 import net from 'node:net';
 import process from 'node:process';
 
-import { buildCookieMap, formatCookieHeader, hasRequiredCookies } from './cookie-store.js';
+import { buildCookieMap, hasRequiredCookies } from './cookie-store.js';
+import { DEFAULT_ORIGIN, isNotebookLmUrl } from './host.js';
 import { resolveChromeProfileDir } from './paths.js';
+import { assertSessionAuthorizes } from './session.js';
 import type { LogFn } from './types.js';
 
-const NOTEBOOKLM_URL = 'https://notebooklm.google.com/';
+// Post-Gemini-migration entry point; the redirect chain resolves the real host (see host.ts).
+const NOTEBOOKLM_URL = `${DEFAULT_ORIGIN}/`;
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -212,53 +215,6 @@ class CdpConnection {
     }
 }
 
-/**
- * Validates cookies by fetching NotebookLM and checking for the "SNlM0e" session token
- * in the HTML response. This confirms the cookies grant authenticated access.
- */
-async function validateNotebookLMSession(
-    cookieMap: Record<string, string>,
-    signal?: AbortSignal,
-): Promise<void> {
-    const cookieHeader = formatCookieHeader(cookieMap);
-    // Use redirect: 'manual' to detect login redirects.
-    // If NotebookLM returns 302 to accounts.google.com, the cookies are not valid.
-    const res = await fetch(NOTEBOOKLM_URL, {
-        headers: {
-            'Cookie': cookieHeader,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        },
-        redirect: 'manual',
-        signal,
-    });
-
-    // A 302 redirect to accounts.google.com means cookies are not authenticating
-    if (res.status >= 300 && res.status < 400) {
-        const location = res.headers.get('location') ?? '';
-        if (location.includes('accounts.google.com')) {
-            throw new Error('NotebookLM redirected to login — cookies are not valid for authenticated access.');
-        }
-    }
-
-    if (!res.ok && res.status < 300) {
-        throw new Error(`NotebookLM returned HTTP ${res.status} ${res.statusText}`);
-    }
-
-    // Must be a 200 with the actual app page
-    if (res.status !== 200) {
-        throw new Error(`NotebookLM returned unexpected status ${res.status}. Expected 200 for authenticated access.`);
-    }
-
-    const html = await res.text();
-    // Verify we got the NotebookLM app, not a login page
-    if (html.includes('accounts.google.com/ServiceLogin') || html.includes('accounts.google.com/v3/signin')) {
-        throw new Error('Got Google login page instead of NotebookLM app — cookies are not valid.');
-    }
-    if (!html.includes('LabsTailwindUi') && !html.includes('notebooklm')) {
-        throw new Error('Page does not appear to be NotebookLM — cookies may be invalid.');
-    }
-}
-
 export async function getNotebookLMCookiesViaChrome(options?: {
     timeoutMs?: number;
     debugConnectTimeoutMs?: number;
@@ -338,23 +294,35 @@ export async function getNotebookLMCookiesViaChrome(options?: {
             );
 
             if (hasRequiredCookies(cookieMap)) {
-                // Check that Chrome actually loaded NotebookLM (not the login page)
-                // by querying the current page URL via CDP
+                // Cheap PRE-filter: while the tab still sits on accounts.google.com there is nothing to
+                // probe. Accept BOTH hosts — after the Gemini migration the flow lands the tab on
+                // notebook.google.com, so an exact notebooklm.google.com match would poll until timeout.
+                let currentUrl = '';
                 try {
                     const evalResult = await cdp.send<{ result?: { value?: string } }>(
                         'Runtime.evaluate',
                         { expression: 'window.location.href' },
                         { sessionId, timeoutMs: 5_000 },
                     );
-                    const currentUrl = evalResult?.result?.value ?? '';
-                    if (currentUrl.includes('notebooklm.google.com') && !currentUrl.includes('accounts.google.com')) {
-                        log?.('[notebooklm] NotebookLM cookies validated successfully.');
-                        return cookieMap;
-                    }
-                    lastTokenError = `Page URL is ${currentUrl} — not authenticated yet`;
+                    currentUrl = evalResult?.result?.value ?? '';
                 } catch (error) {
-                    // If we can't check the URL, still try to return cookies if we have them
                     lastTokenError = error instanceof Error ? error.message : String(error);
+                }
+
+                // The REAL check. Having SID + __Secure-1PSID and a notebooklm-looking URL proves nothing:
+                // Google keeps those cookies after a session dies and `/login` IS a notebooklm URL. Probe a
+                // real RPC — if it answers, `notebooks create` will work; otherwise keep waiting for the
+                // user to finish signing in instead of saving a session that fails later in the ingest.
+                if (isNotebookLmUrl(currentUrl)) {
+                    try {
+                        const validated = await assertSessionAuthorizes(cookieMap);
+                        log?.('[notebooklm] Session validated against NotebookLM (RPC probe OK).');
+                        return validated; // includes the __Secure-1PSIDTS Google rotated during init()
+                    } catch (error) {
+                        lastTokenError = error instanceof Error ? error.message : String(error);
+                    }
+                } else if (!lastTokenError) {
+                    lastTokenError = `Page URL is ${currentUrl} — not authenticated yet`;
                 }
             }
 

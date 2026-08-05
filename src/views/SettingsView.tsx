@@ -38,9 +38,10 @@ export function SettingsView({ onNavigate }: { onNavigate?: (v: ViewId) => void 
   const [browsers, setBrowsers] = useState(BROWSERS);
 
   // URL del notebook del usuario (el específico si ya existe; si no, la home de NotebookLM).
+  // Host post-migración a Gemini: NotebookLM vive en notebook.google.com (el dominio viejo sólo redirige).
   const notebookUrl = notebookId
-    ? `https://notebooklm.google.com/notebook/${notebookId}`
-    : "https://notebooklm.google.com/";
+    ? `https://notebook.google.com/notebook/${notebookId}`
+    : "https://notebook.google.com/";
 
   useEffect(() => {
     loadOnboarding().then((s) => { setCv(s.file); setNotebookId(s.notebookId); });

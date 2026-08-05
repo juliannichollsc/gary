@@ -112,6 +112,59 @@ payload needs a live test to confirm/adjust. UI already: `notebook` ingest event
   actually work — no more false "connected then fails". Ingest errors now bounce the UI back to the connect gate.
 - ✅ **VERIFIED IN THE REAL APP (owner ran onboarding 2026-07-05):** create + CV ingest works end-to-end from
   the onboarding UI (screenshot: notebook `eedde5cd…` created, "✓ CV indexado en NotebookLM").
+- ✅ **"No se pudo crear el notebook … exit code 1" tras "Verificar sesión" — ROOT-CAUSED + FIXED (2026-08-04).**
+  La sesión de Google guardada estaba muerta (traza: `notebook.google.com` → `/login` → `ServiceLogin` →
+  `InteractiveLogin` → `accountchooser`, sin `LabsTailwindUi`) **y ningún camino de `login` lo detectaba**:
+  `validateNotebookLMSession` en `auth.ts` era **código muerto** (definido, nunca llamado), así que `login`
+  declaraba éxito con sólo ver `SID` + `__Secure-1PSID` y una URL de host notebooklm — y `/login` (la ruta de
+  NO-logueado) pasa ese filtro. Resultado: "Verificar sesión" en verde, `cookies.json` sobrescrito con cookies
+  muertas, y el fallo apareciendo tarde en `notebooks create`. Fixes:
+  1. **`scripts/session.ts` (nuevo):** `assertSessionAuthorizes(cookieMap)` = el ÚNICO check honesto —
+     `RPCClient.init()` (sigue redirects, fija el host, saca `SNlM0e`) + un `LIST_NOTEBOOKS` real. Devuelve el
+     jar REFRESCADO (`__Secure-1PSIDTS` rota durante el init). `sessionAuthorizes()` = variante booleana.
+  2. **`auth.ts`:** borrado el validador muerto; el bucle de polling ahora sólo retorna cuando el probe RPC pasa
+     (la URL queda como pre-filtro barato), y retorna el jar refrescado.
+  3. **`main.ts handleLogin`:** `--cookies` valida ANTES de escribir (sale 1 y deja `cookies.json` intacto si no
+     autoriza); `login` sin `--force` re-loguea si la sesión guardada ya no autoriza (antes: "Already
+     authenticated" a ciegas).
+  4. **`ingest.rs connect_notebooklm(app)`:** ahora es **puente-primero** (mandato CLAUDE.md): corre
+     `engines/notebooklm-session.mjs <browser_port>` → `login --cookies "<hdr>"` (instantáneo, sin ventana
+     nueva, sin polling) y **sólo** cae a `login --force` (Chrome propio del plugin, hasta 5 min) si `:9333`
+     está cerrado o su sesión no entra a NotebookLM. El puerto sale de Settings.
+  5. **`login --check [--json]` (nuevo subcomando)** → `{ "authorized": bool }`, exit 1 si no. Sondeo de sólo
+     lectura de la sesión GUARDADA: sin navegador, sin polling, sin escribir (salvo refrescar `1PSIDTS`).
+  6. **`start_ingest` — puerta de acceso en 3 pasos + AUTO-REPARACIÓN.** Antes sólo comprobaba que
+     `cookies.json` EXISTIERA (`notebooklm_status()`), así que una sesión caducada pasaba el gate y reventaba
+     después. Ahora: (1) archivo presente → (2) `login --check` (¿la cuenta sigue con acceso?) → (3) si caducó,
+     **renueva una vez desde `:9333`** (`renew_session_from_browser`, el mismo puente del verify) y sólo si eso
+     falla aborta con instrucciones. Nunca abre un segundo Chrome (el login interactivo sigue viviendo sólo en
+     "Verificar sesión"). La decisión **reusar vs recrear** no cambió: `notebooks exists <uuid>` → reusar
+     (borra fuentes y re-ingesta) / recrear.
+  7. **CANDADO DE CUENTA — la causa real de los 11 notebooks "GARY" duplicados en `library.json`.** El puente
+     toma la cuenta que tenga el navegador `:9333` **en ese momento**; si ahí hay varias sesiones de Google,
+     el ingest puede acabar mirando otra cuenta. Ahí `notebooks exists` responde `false` — que NO significa
+     "lo borraron" sino "no existe EN ESTA cuenta" — y el flujo recreaba, duplicando el notebook por cuenta.
+     (Comprobado: `wXbhsf` está BIEN; la cuenta `juliannichollsc@` tiene 1 notebook y el RPC devuelve
+     exactamente ese — verificado contra la UI del navegador. También se sondeó el RPC real que dispara la web
+     (`ub2Bae` = galería destacada, `wXbhsf` = los del usuario) para descartar paginación.)
+     Fix: `RPCClient.getAccountEmail()` (extraída en `init()`) → `login --check --json` devuelve
+     `{authorized, account}` → el evento `gary://ingest {kind:"notebook"}` incluye `account` → la UI lo
+     persiste como `notebookAccount` → `start_ingest(cvPath, notebookId, notebookAccount)` decide:
+     **existe → reusar y actualizar** (nuevo CV) · **no existe y la cuenta COINCIDE → recrear** (lo borraron)
+     · **no existe y la cuenta DIFIERE → PARAR** con "tu notebook pertenece a X pero estás conectado con Y…"
+     (no se crea nada; el contexto no se duplica). Sin `notebookAccount` guardado (estado antiguo) se recrea
+     como antes, y el primer ingest ya sella la cuenta.
+  8. **Regla de modalidad ↔ ciudad en el RAG** (`buildContextMd` + `gary-context.md.example` +
+     `operating-rules.md §1`): la modalidad sola no filtra. **Presencial/híbrido ⇒ SOLO la ciudad actual**
+     (salvo condición de reubicación declarada); **remoto ⇒ la ciudad no limita** — acepta remoto de su
+     ciudad/país **más** remote-worldwide, LATAM, Américas y "remote" a secas, bajo region-lock §1. Ahora
+     queda ESCRITO en el contexto que se ingesta al notebook, en vez de que el agente lo infiera cada sesión.
+  **Verificado en vivo (cadena completa):** cookies falsas → rechazadas sin tocar el archivo; `login --check`
+  con la sesión muerta de ayer → `{authorized:false}` exit 1 → puente `:9333` → "Cookies saved and validated
+  (41 cookies)" → `login --check` → `{authorized:true}` → `notebooks exists a5014b85…` → `true` (reusa) /
+  uuid inventado → `false` (recrea) → `notebooks create --json` → UUID real. Puerto muerto (`:9999`) →
+  `logged in: NO (cdp down)` → aborta con el mensaje accionable. Notebook de prueba borrado con `WWINqb` y
+  `library.json` restaurado a `a5014b85…`. `cargo check` + `tsc --noEmit` GREEN.
 - ✅ **"Continuar" was stuck after ingest — FIXED.** Step-2 `canContinue` required `progress>=1 && roles.length>0`,
   but the REAL backend never emits a `roles` event (only the simulation did) → button stayed disabled. Now
   `ingestDone = progress>=1` (roles NOT required).

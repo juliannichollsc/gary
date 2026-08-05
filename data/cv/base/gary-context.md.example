@@ -36,6 +36,11 @@
 - Teléfono: {{PHONE}}
 - Email: {{EMAIL}}
 
+### Reglas de modalidad (derivadas — cómo se filtra por ubicación)
+> _La modalidad SOLA no basta para filtrar: hay que anclarla a la ciudad actual. El onboarding genera estas dos líneas según lo que el candidato eligió (omite la que no aplique)._
+- **Presencial/híbrido → SIEMPRE anclados a {{CITY}}.** Solo califican ofertas en esa ciudad o su área metropolitana; presencial/híbrido en otra ciudad se descarta, salvo la condición declarada ({{RELOCATION_CONDITION}}).
+- **Remoto → la ciudad NO limita.** Califican tanto las ofertas remotas de {{CITY}} y su país como las regiones remotas que ya usamos: remote-worldwide, LATAM (incluido el país), Américas y "remote" a secas. Sigue aplicando el region-lock §1 (se descartan US-only / EU-only / NA-only y presencial en el extranjero).
+
 ### Enlaces de contacto/exposición
 - linkedin: {{LINKEDIN_URL}}
 - Github: {{GITHUB_URL}}

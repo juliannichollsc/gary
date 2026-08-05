@@ -220,20 +220,42 @@ pub fn notebooklm_status() -> bool {
     has("SID") && has("__Secure-1PSID")
 }
 
-// Session verify — DELEGADO ENTERAMENTE AL PLUGIN (decisión del owner). `login --force` abre el Chrome del
-// propio plugin (su perfil en %APPDATA%/notebooklm-ai/chrome-profile), espera a que el usuario inicie sesión
-// —sondeando hasta 5 min— y escribe `cookies.json` él mismo. Es el flujo que ya funcionaba antes de empaquetar
-// la app; GARY no vuelve a tocar las cookies.
+// Lee la sesión de Google del navegador de automatización (:9333) vía `engines/notebooklm-session.mjs`:
+// se ATACHA una vez (CDP), valida PROBANDO un RPC real de NotebookLM y, sólo si autoriza, imprime
+// `COOKIES: <header>`. Sin navegador nuevo, sin polling, 0 tokens. `None` = no hay sesión utilizable ahí.
+fn bridge_cookies_from_automation_browser(port: u16) -> Option<String> {
+    let root = project_root();
+    let script = root.join("engines").join("notebooklm-session.mjs");
+    if !script.exists() {
+        return None;
+    }
+    let mut cmd = Command::new("node");
+    hide_console(&mut cmd);
+    let out = cmd.arg(&script).arg(port.to_string()).current_dir(&root).output().ok()?;
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find_map(|l| l.strip_prefix("COOKIES: "))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+// Session verify ("Conectar → Verificar sesión"). Dos caminos, en este orden:
+//   1. PUENTE desde el navegador de automatización :9333 — la sesión que el usuario ya validó en
+//      Conexiones (mandato de CLAUDE.md: toda sesión de Google sale de ESE navegador). Instantáneo,
+//      sin abrir nada. `login --cookies` ahora RECHAZA cookies que no autorizan NotebookLM, así que
+//      llegar aquí con éxito garantiza que `notebooks create` funcionará.
+//   2. Fallback `login --force`: abre el Chrome propio del plugin (perfil en %APPDATA%/notebooklm-ai/
+//      chrome-profile) y espera el login interactivo. Sólo si :9333 está cerrado o su sesión no entra
+//      a NotebookLM (estar logueado en Gmail NO basta: hay que pasar el selector de cuentas de Google).
 //
-// `--force` es obligatorio: sin él, `handleLogin` (main.ts:155) ve unas cookies CADUCADAS que aún tienen SID +
-// __Secure-1PSID, responde "Already authenticated" y sale con éxito sin validar nada contra Google — y la
-// ingesta muere después en `notebooks create`.
-//
-// Puede tardar minutos (login interactivo), así que la webview debe darle margen: `verifyNlm` corre esto
-// contra su propio timeout.
+// Puede tardar minutos en el camino 2 (login interactivo), así que la webview le da margen: `verifyNlm`
+// corre esto contra su propio timeout.
 #[tauri::command]
-pub async fn connect_notebooklm() -> Result<bool, String> {
+pub async fn connect_notebooklm(app: AppHandle) -> Result<bool, String> {
+    let port = browser_port(&app);
     tauri::async_runtime::spawn_blocking(move || {
+        if renew_session_from_browser(port) {
+            return Ok(true);
+        }
         let out = plugin_command(&["login", "--force"])?
             .output()
             .map_err(|e| format!("no se pudo iniciar sesión: {e}"))?;
@@ -241,6 +263,43 @@ pub async fn connect_notebooklm() -> Result<bool, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+fn browser_port(app: &AppHandle) -> u16 {
+    crate::settings::get_settings(app.clone())
+        .map(|s| s.browser_port)
+        .unwrap_or(9333)
+}
+
+// Camino 1 del verify, aislado para poder REUSARLO como auto-reparación dentro del ingest: puente
+// :9333 → `login --cookies` (que valida antes de guardar). `true` = la sesión guardada ya autoriza RPCs.
+fn renew_session_from_browser(port: u16) -> bool {
+    let Some(header) = bridge_cookies_from_automation_browser(port) else { return false };
+    matches!(plugin_command(&["login", "--cookies", &header]).map(|mut c| c.output()),
+             Ok(Ok(out)) if out.status.success())
+}
+
+// ¿La cuenta de Google guardada SIGUE teniendo acceso a NotebookLM ahora mismo? `login --check` sondea un
+// RPC real (no abre navegador, no escribe, no sondea en bucle). Que `cookies.json` EXISTA no prueba nada:
+// SID/__Secure-1PSID sobreviven a una sesión muerta — ese era el bug que reventaba en `notebooks create`.
+fn session_authorized() -> bool {
+    matches!(run_plugin_quiet(&["login", "--check", "--json"]), Ok((true, _)))
+}
+
+// La cuenta de Google a la que responde la sesión actual (`login --check --json` → `account`). El puente
+// toma la cuenta que tenga el navegador de automatización; si ese Chrome tiene VARIAS cuentas, puede no ser
+// la dueña del notebook del candidato — y entonces `notebooks exists` da false y GARY recrearía el notebook
+// en la cuenta equivocada. Se muestra en el log para que el usuario lo vea antes de que eso pase.
+fn session_account() -> Option<String> {
+    let (ok, out) = run_plugin_quiet(&["login", "--check", "--json"]).ok()?;
+    if !ok {
+        return None;
+    }
+    first_json_object(&out)?
+        .get("account")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 // Drive the full ingest pipeline: authenticate → create-or-reuse the notebook → index the CV. Returns
@@ -252,7 +311,9 @@ pub async fn start_ingest(
     app: AppHandle,
     cv_path: String,
     notebook_id: Option<String>,
+    notebook_account: Option<String>,
 ) -> Result<bool, String> {
+    let port = browser_port(&app);
     tauri::async_runtime::spawn_blocking(move || {
         let emit = |v: Value| {
             let _ = app.emit("gary://ingest", v);
@@ -265,13 +326,30 @@ pub async fn start_ingest(
             }};
         }
 
-        // NO auto-login here (that would launch a second Chrome + poll for 5 min → overloads the machine).
-        // The session is established manually beforehand via `connect_notebooklm` (reuses the :9333 browser).
-        // If cookies aren't present we stop cleanly and tell the user to connect — no browser is opened.
+        // Puerta de acceso, en tres pasos y SIN abrir un segundo Chrome (eso sondearía 5 min y satura la
+        // máquina; el login interactivo vive sólo en "Verificar sesión"):
+        //   1. ¿hay archivo de cookies? (lectura pura)
+        //   2. ¿esa cuenta de Google SIGUE teniendo acceso a NotebookLM? (`login --check` = RPC real)
+        //   3. si caducó, AUTO-REPARA una vez desde el navegador de automatización :9333 — que ya está
+        //      logueado para Gmail/boards — en vez de morir a mitad del ingest.
         if !notebooklm_status() {
             bail!("Conecta NotebookLM primero (botón Conectar → Verificar sesión).".to_string());
         }
-        emit(json!({ "kind": "log", "line": "· Sesión de NotebookLM verificada" }));
+        if !session_authorized() {
+            emit(json!({ "kind": "log", "line": "· Sesión caducada → renovando desde el navegador…" }));
+            if !renew_session_from_browser(port) {
+                bail!("Tu sesión de Google caducó y no se pudo renovar desde el navegador de automatización. \
+                       Abre NotebookLM ahí, inicia sesión y pulsa Conectar → Verificar sesión."
+                    .to_string());
+            }
+        }
+        // Deja la CUENTA a la vista: el puente usa la que tenga el navegador de automatización y, si ahí hay
+        // varias sesiones de Google, puede no ser la dueña del notebook del candidato.
+        let account = session_account();
+        emit(json!({ "kind": "log", "line": match &account {
+            Some(a) => format!("· Sesión de NotebookLM verificada (cuenta: {a})"),
+            None => "· Sesión de NotebookLM verificada".to_string(),
+        }}));
         emit(json!({ "kind": "progress", "value": 0.25 }));
 
         // Helper: create a brand-new notebook and return its id (or bail on failure).
@@ -314,15 +392,36 @@ pub async fn start_ingest(
                     }
                     id.to_string()
                 } else {
-                    // borrado en la web (o id inválido) → recrear (el UUID nuevo se reporta abajo).
-                    emit(json!({ "kind": "log", "line": "· El notebook ya no existe en NotebookLM → recreando…" }));
-                    create_notebook!()
+                    // "No existe" es AMBIGUO: puede ser (a) el usuario lo borró en la web → recrear, o
+                    // (b) el navegador está en OTRA cuenta de Google → el notebook existe pero es
+                    // inaccesible. Recrear en el caso (b) es justo lo que genera notebooks "GARY"
+                    // duplicados por cuenta, así que sólo recreamos cuando la cuenta COINCIDE con la que
+                    // creó el notebook (o cuando no la tenemos guardada, estado antiguo → mejor esfuerzo).
+                    match (notebook_account.as_deref(), account.as_deref()) {
+                        (Some(owner), Some(now)) if !owner.eq_ignore_ascii_case(now) => {
+                            bail!(format!(
+                                "Tu notebook ({id}) pertenece a {owner}, pero el navegador está conectado con \
+                                 {now}: no fue borrado, simplemente esta cuenta no tiene acceso. Inicia sesión \
+                                 con {owner} en el navegador de automatización (Conexiones) y vuelve a intentar \
+                                 — no creo uno nuevo para no duplicar tu contexto."
+                            ));
+                        }
+                        _ => {
+                            emit(json!({ "kind": "log", "line": match &account {
+                                Some(a) => format!("· El notebook {id} ya no existe en {a} → recreando…"),
+                                None => "· El notebook ya no existe en NotebookLM → recreando…".to_string(),
+                            }}));
+                            create_notebook!()
+                        }
+                    }
                 }
             }
             None => create_notebook!(),
         };
-        // Siempre reporta el id (posiblemente nuevo) para que la UI lo persista y "Abrir NotebookLM" apunte bien.
-        emit(json!({ "kind": "notebook", "id": nb_id }));
+        // Siempre reporta el id (posiblemente nuevo) + la CUENTA dueña, para que la UI los persista: el id
+        // hace que "Abrir NotebookLM" apunte bien, y la cuenta permite distinguir en el próximo ingest
+        // "lo borraron" (recrear) de "estás en otra cuenta" (parar).
+        emit(json!({ "kind": "notebook", "id": nb_id, "account": account }));
         emit(json!({ "kind": "progress", "value": 0.5 }));
 
         emit(json!({ "kind": "log", "line": "⟳ Indexando CV en NotebookLM…" }));

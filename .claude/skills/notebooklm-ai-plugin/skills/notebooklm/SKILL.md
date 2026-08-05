@@ -81,6 +81,25 @@ Notes:
   logged into Gmail is not enough — the browser must have entered NotebookLM (passed Google's account chooser).
 - The RPC auth works because `rpc-client.ts` `init()` follows redirects (refreshing the rotating
   `__Secure-1PSIDTS`); only the long-lived `__Secure-1PSID` must stay valid.
+- **Host (NotebookLM → Gemini migration):** the app moved to **`notebook.google.com`**. The legacy
+  `notebooklm.google.com` still serves the app HTML via redirect, but every `batchexecute` RPC posted there
+  answers **401** — that's why `notebooks create` blew up while login/status looked healthy. The host is now
+  **resolved at runtime** (`scripts/host.ts`): `init()` pins the origin where the redirect chain lands and all
+  requests (RPC, chat stream, upload, media) target it. Never hardcode a host; if Google moves it again this
+  keeps working. `engines/notebooklm-session.mjs` validates by PROBING a real read-only RPC (`wXbhsf`) on the
+  resolved origin — "the page loaded" is not proof the session authorizes RPCs.
+- **`login` NUNCA guarda una sesión sin probarla** (`scripts/session.ts` → `assertSessionAuthorizes`: `init()`
+  + un `wXbhsf` real). Tener `SID` + `__Secure-1PSID` NO prueba nada — sobreviven a una sesión muerta y
+  `notebook.google.com/login` también es "una URL de NotebookLM". Antes eso hacía que "Verificar sesión"
+  dijera OK, sobrescribiera `cookies.json` con cookies muertas, y el fallo apareciera tarde en
+  `notebooks create` → *"NotebookLM redirected to Google login"*. Ahora los tres caminos validan:
+  `login --cookies <hdr>` (puente :9333) rechaza y sale 1 sin tocar el archivo; `login` sin `--force`
+  re-loguea si la sesión guardada ya no autoriza; `login --force` sigue sondeando hasta que el probe pase.
+  Además se guarda el jar REFRESCADO (Google rota `__Secure-1PSIDTS` durante el `init()`).
+- **`login --check [--json]`** = "¿esta cuenta de Google TIENE acceso a NotebookLM ahora mismo?" → `{ "authorized": bool }`,
+  exit 1 si no. Sondea un RPC real; no abre navegador, no escribe salvo refrescar `__Secure-1PSIDTS`, no sondea en
+  bucle. Es el paso previo obligatorio al ingest: si da `false`, renueva con el puente `:9333` (`login --cookies`)
+  ANTES de tocar el notebook, en vez de morir a mitad de camino.
 - **Existence check** (to decide reuse vs recreate): `notebooks exists <uuid> --json` → `{ "exists": bool }`.
   It uses LIST_NOTEBOOKS membership by UUID — do NOT use `sources list`, which returns `[]` for a DELETED
   notebook (can't tell "empty" from "gone").
