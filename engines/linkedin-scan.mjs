@@ -104,11 +104,31 @@ let browser;
 try { browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`); }
 catch { console.error(`CDP ${PORT} down. Chrome:${PORT} must be up + logged in (no relaunch here).`); process.exit(1); }
 const ctx = browser.contexts()[0];
-// ALWAYS open THIS worker's OWN tab (never reuse an existing LinkedIn tab). This is what
-// makes multi-agent runs safe: N parallel workers (1 per tab, each a DISJOINT title/location
-// partition assigned by the orchestrator, each with its own --seen/--out) get N independent
-// tabs and never collide on one page. Single-worker runs just get a fresh tab.
+// ONE worker, ONE tab, SERIAL. NEVER run several linkedin-scan processes in parallel (one per tab/partition):
+// the whole account shares ONE rate budget, so N workers = N× the request rate → 429 + LinkedIn "integrity"
+// account checkpoint. Parallelism is across SOURCES only (e.g. Gmail harvest beside this scan).
 const page = await ctx.newPage();
+
+// ── ANTI-BLOCK PACING (mandatory — documented in .claude/skills/source-linkedin §1) ──────────────────────
+// Human-like, JITTERED waits (never fixed intervals, never bursts). Defaults ≈ 8–10 offers/min max:
+//   card/offer open: 4–9 s · results page: 8–15 s · between combos: 60–150 s · per-run cap: --max-views 120
+// --pace <x> scales every wait (e.g. --pace 1.5 slower). Below 1 is refused: those are the floor.
+const PACE = Math.max(1, parseFloat(arg('--pace', '1')) || 1);
+const MAX_VIEWS = Math.max(1, parseInt(arg('--max-views', '120'), 10));
+let views = 0, ABORT = '';
+const nap = (minS, maxS) => page.waitForTimeout(Math.round((minS + Math.random() * (maxS - minS)) * 1000 * PACE));
+// Any 429 on a LinkedIn document → stop the whole run (never retry into a throttle).
+page.on('response', (r) => { if (r.status() === 429 && /linkedin\.com/.test(r.url()) && !ABORT) ABORT = `HTTP 429 on ${r.url().slice(0, 80)}`; });
+// Checkpoint / "unusual activity" / security verification = the account-integrity wall → STOP for the user.
+async function blocked() {
+  if (ABORT) return ABORT;
+  const u = page.url();
+  if (/\/checkpoint|\/challenge|\/authwall|\/login|\/uas\//.test(u)) return (ABORT = `wall: ${u.slice(0, 80)}`);
+  const t = await page.evaluate(() => (document.body?.innerText || '').slice(0, 4000)).catch(() => '');
+  if (/unusual activity|actividad inusual|security verification|verificaci[oó]n de seguridad|let'?s do a quick security check|too many requests/i.test(t)) return (ABORT = 'LinkedIn integrity/security check on page');
+  return '';
+}
+const stopNow = () => { if (ABORT) { console.error(`\n⛔ LINKEDIN-BLOCK: ${ABORT}. Run STOPPED + progress saved. Do NOT retry today — let the user clear any check in Chrome:9333, then resume later (seen.json makes it resumable).`); return true; } if (views >= MAX_VIEWS) { console.error(`\n⏸  --max-views ${MAX_VIEWS} reached — stopping cleanly (resume in a later session).`); return true; } return false; };
 
 // Scrape the detail PANE (the reliable source). The JD panel only renders in the SEARCH split-view
 // layout — navigating directly to /jobs/view/{id} renders nav chrome instead (the bug that broke the
@@ -134,10 +154,13 @@ async function scanCombo(kw, loc, geo) {
   const survivors = [], ids = new Set();
   let rejected = 0, dup = 0;
   for (let p = 0; p < maxPages; p++) {
-    await page.goto(`${base}&start=${p * 25}`, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    await page.waitForTimeout(2500);
-    for (let s = 0; s < 5; s++) { await page.mouse.wheel(0, 1700).catch(() => {}); await page.waitForTimeout(500); }
-    if (/\/authwall|\/login/.test(page.url())) { console.error('Login wall — Chrome:9333 not logged in.'); break; }
+    if (stopNow()) break;
+    if (p > 0) await nap(8, 15);                                            // between results pages
+    try { await page.goto(`${base}&start=${p * 25}`, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
+    catch (e) { console.error(`  [${comboLabel}] page ${p + 1} nav failed (${e.message.split('\n')[0]}) — stopping combo, results kept.`); break; }
+    await nap(2.5, 5);
+    for (let s = 0; s < 5; s++) { await page.mouse.wheel(0, 1700).catch(() => {}); await nap(0.6, 1.4); }
+    if (await blocked()) break;
     const cards = await page.$$eval('a[href*="/jobs/view/"]', as => {
       const o = [], s = new Set();
       for (const a of as) { const m = a.href.match(/\/jobs\/view\/(\d+)/); if (m && !s.has(m[1])) { s.add(m[1]); o.push({ id: m[1], title: (a.getAttribute('aria-label') || a.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 90) }); } }
@@ -148,11 +171,14 @@ async function scanCombo(kw, loc, geo) {
       if (ids.has(c.id)) continue;
       ids.add(c.id); pageNew++;
       if (seen[c.id]) { dup++; continue; }
+      if (stopNow()) break;
+      views++;
       try {
         await page.locator(`a[href*="/jobs/view/${c.id}"]`).first().click({ timeout: 8000 });
         await page.waitForFunction((id) => location.href.includes('currentJobId=' + id), c.id, { timeout: 8000 }).catch(() => {});
         await page.waitForSelector('.jobs-description__content, #job-details', { timeout: 8000 }).catch(() => {});
-        await page.waitForTimeout(900);
+        await nap(1.5, 3);                                                   // let the JD pane settle (reading time)
+        if (await blocked()) break;
         const data = await scrapeDetail();
         if (data.jd.length < 60) { ids.delete(c.id); continue; } // JD didn't load → leave UNSEEN, retry next run (don't pass it through)
         const why = prefilter(`${c.title} ${data.jd}`);          // RESTRICTIVE: screen TITLE + JD against the CV config
@@ -165,6 +191,7 @@ async function scanCombo(kw, loc, geo) {
           seen[c.id] = { title: c.title, company: data.company, where: data.where, combo: comboLabel, v: 'survivor', firstSeen: new Date().toISOString(), easy: true };
         }
       } catch (e) { /* leave unseen → retry next run */ }
+      await nap(4, 9);                                                       // between offers: ~8–10/min max
     }
     console.log(`  [${comboLabel}] page ${p + 1}: ${pageNew} new ids (survivors ${survivors.length}, rejected ${rejected})`);
     writeSeen(); // incremental persistence (resumable + safe on hard stop)
@@ -209,10 +236,12 @@ async function scanUrls(urls) {
     const id = m[1] || m[2];
     if (ids.has(id)) continue; ids.add(id);
     if (seen[id]) { dup++; continue; }
+    if (stopNow()) break;
+    views++;
     const recordUrl = `https://www.linkedin.com/jobs/view/${id}/`;         // canonical URL for the offers map
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      if (/\/authwall|\/login/.test(page.url())) { console.error('Login wall — Chrome not logged in.'); break; }
+      if (await blocked()) break;
       await page.waitForSelector('#job-details, .jobs-description__content, [class*="jobs-description"]', { timeout: 14000 }).catch(() => {});
       await page.waitForTimeout(1500);   // the pane hydrates after the selector attaches — let the JD text settle
       const data = await scrapeDetail();
@@ -243,7 +272,7 @@ async function scanUrls(urls) {
       }
     } catch { /* transient → leave unseen, retry next run */ }
     writeSeen();                        // incremental (resumable + safe on hard stop)
-    await page.waitForTimeout(600);     // gentle pacing (anti-detection)
+    await nap(4, 9);                    // anti-block pacing: ~8–10 offers/min max, jittered
   }
   console.log(`=== gmail-urls === scanned ${ids.size} | ${dup} seen | ${closed} closed | ${rejected} pre-filtered | ${survivors.length} SURVIVORS`);
   return { scannedIds: ids.size, rejected, dup, closed, survivors };
@@ -261,8 +290,12 @@ if (urlsArg) {
 } else if (ALL) {
   // FULL SWEEP — every title × location, one tab, serial. Consolidated output.
   const byCombo = [], all = [];
-  for (const kw of ALL_TITLES) {
+  let first = true;
+  sweep: for (const kw of ALL_TITLES) {
     for (const L of ALL_LOCATIONS) {
+      if (stopNow()) break sweep;
+      if (!first) { console.log('  …pausing between combos (anti-block)'); await nap(60, 150); }
+      first = false;
       const r = await scanCombo(kw, L.geo ? '' : L.loc, L.geo || '');
       byCombo.push({ combo: r.combo, scanned: r.scannedIds, rejected: r.rejected, dup: r.dup, survivors: r.survivors.length });
       all.push(...r.survivors);

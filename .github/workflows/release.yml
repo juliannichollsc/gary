@@ -4,7 +4,8 @@ name: Release
 # Non-technical users just download the .exe from the Releases page — no clone, no build.
 #
 # Trigger: push a version tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`), or run manually.
-# Windows only for now; add macos-latest / ubuntu-22.04 to the matrix once the portability pass lands.
+# Windows (NSIS .exe) + Ubuntu (.deb + .AppImage). Each runner bundles for its own OS: Linux targets
+# come from src-tauri/tauri.linux.conf.json (merged by Tauri only on Linux), so Windows stays untouched.
 
 on:
   push:
@@ -21,9 +22,19 @@ jobs:
         include:
           - platform: windows-latest
             args: ''
+          # 22.04 (glibc 2.35) so the .deb/.AppImage also run on newer Ubuntu releases.
+          - platform: ubuntu-22.04
+            args: ''
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux system deps (Tauri v2)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libssl-dev libxdo-dev build-essential curl wget file
 
       # Sin `version:` a propósito: la toma de `packageManager` en package.json (pnpm@11.1.2). Fijarla aquí
       # además crearía dos fuentes de verdad y action-setup@v4 aborta con ERR_PNPM_BAD_PM_VERSION.
@@ -60,6 +71,8 @@ jobs:
             ## Download & install
             Grab the installer for your OS below and double-click.
             **Windows:** `GARY_x.y.z_x64-setup.exe` (NSIS).
+            **Ubuntu/Debian:** `GARY_x.y.z_amd64.deb` (`sudo apt install ./GARY_*.deb`) or the portable
+            `GARY_x.y.z_amd64.AppImage` (`chmod +x` and run). Requires Node >= 22.13 and Chrome/Chromium.
 
             > First launch may show a Windows SmartScreen notice ("Windows protected your PC")
             > because the installer isn't code-signed yet — click **More info → Run anyway**.

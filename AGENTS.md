@@ -87,13 +87,16 @@ verify locally. Build in order; don't start a stage until the previous one runs.
 - **Brain (runtime):** `.claude/agents/` (4 job agents) + `.claude/skills/` (engine + board skills + GSAP/UI
   suite + NotebookLM).
 - **Engines (the bots):** `engines/*.mjs` — Playwright/CDP scrapers, apply-to-Submit filler, CV builder.
-- **Automation browser:** dedicated debug Chrome on port 9333 (`engines/start-chrome-debug.cmd`).
+- **Automation browser:** dedicated debug Chrome on port 9333 (`engines/start-chrome-debug.cmd` / `.sh` on Linux).
 - **Design source of truth:** `pencil/gary.pen` (open in the Pencil editor) + `docs/design-system.md` +
   `docs/components.md`. `pencil/PROMPTS.md` holds the resolved art direction per screen.
 
 ## Prerequisites to run
 1. **Node** ≥ 22.13 + **pnpm** ≥ 11 (`corepack enable pnpm`). **Rust** ≥ 1.96. **Use pnpm — NOT npm/yarn.**
 2. **Windows:** Tauri needs **MSVC C++ Build Tools** ("Desktop development with C++"). **WebView2** runtime.
+3. **Ubuntu (22.04+):** `sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+   libssl-dev libxdo-dev build-essential curl wget file`. `pnpm tauri build` → `.deb` + `.AppImage`
+   (`src-tauri/tauri.linux.conf.json`, merged only on Linux; Windows keeps NSIS). Chat shell = `$SHELL`.
 
 ## How to run (local)
 ```
@@ -156,6 +159,7 @@ build time. Field answers/rules are persisted to the RAG, never hardcoded.
   `data/offers-master.md → ## CANAL ATS` (title+URL+location, `filt:` date, tag `_(ATS: solo título, sin WebFetch)_`);
   the user reads each JD on open. Metrics MANDATORY with **`tokens=0`** (all deterministic), counted in the `ATS`
   column. Fully candidate-agnostic. Full rule: `docs/operating-rules.md §4`.
+- **MANDATORY — LinkedIn anti-block pacing (protect the user's account).** **LinkedIn = ONE `linkedin-scan` process, ONE tab, paced: jittered 4–9 s per offer (≤10/min), 8–15 s per results page, 60–150 s per combo, ≤120 views/run; NEVER split LinkedIn into parallel workers/tabs; on 429/checkpoint/"unusual activity" the engine stops → do NOT retry the same day** (incident 2026-10-28: 0.9 s/offer + parallel workers put the account into LinkedIn's integrity check). Full rule: `source-linkedin` §1.
 - **MANDATORY — source EVERY channel through GARY's automation browser (:9333), NEVER through Claude's
   built-in MCP connectors.** GARY's connections are the sessions the user logged in + validated in the
   **Conexiones** panel, living in the dedicated debug Chrome (`config/profile.yml` →

@@ -27,9 +27,20 @@ You chat with GARY in plain language, and it works quietly in the background on 
 
 ## ⬇️ Download & install (no coding required)
 
-Not a developer? You don't build anything. Go to the **[Releases page](https://github.com/juliannichollsc/gary/releases/latest)**, download `GARY_x.y.z_x64-setup.exe`, and double-click it. Currently **Windows only**.
+Not a developer? You don't build anything. Go to the **[Releases page](https://github.com/juliannichollsc/gary/releases/latest)**, download `GARY_x.y.z_x64-setup.exe` (Windows) or `GARY_x.y.z_amd64.deb` / `.AppImage` (Ubuntu), and install it.
 
 > On first launch Windows may show *"Windows protected your PC"* (the installer isn't code-signed yet) — click **More info → Run anyway**.
+
+**Ubuntu (22.04+):** GARY needs **Node ≥ 22.13** and **Google Chrome/Chromium** already installed. Then:
+
+```bash
+# Option A — .deb (installs GARY in the app menu)
+sudo apt install ./GARY_x.y.z_amd64.deb
+
+# Option B — portable AppImage (no install)
+chmod +x GARY_x.y.z_amd64.AppImage
+./GARY_x.y.z_amd64.AppImage
+```
 
 ---
 
@@ -94,9 +105,42 @@ corepack enable pnpm   # GARY uses pnpm (not npm)
 pnpm install
 pnpm tauri dev
 ```
-Requires Rust ≥ 1.96 + Node ≥ 22.13 + pnpm ≥ 11 (Windows: MSVC C++ Build Tools + WebView2). See `CLAUDE.md` for the build task list and `docs/operating-rules.md` for the methodology.
+Requires Rust ≥ 1.96 + Node ≥ 22.13 + pnpm ≥ 11 (Windows: MSVC C++ Build Tools + WebView2; Ubuntu: `sudo apt install libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev build-essential curl wget file`). See `CLAUDE.md` for the build task list and `docs/operating-rules.md` for the methodology.
 
-> **Platform: Windows only for now.** The installer ships as a Windows `.exe` (NSIS). Linux/macOS builds are on the roadmap but need a portability pass and aren't available yet.
+#### Ubuntu — build & run from source (step by step)
+```bash
+# 1. System libraries Tauri needs (WebKitGTK, tray, SVG, SSL)
+sudo apt update
+sudo apt install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+  libssl-dev libxdo-dev build-essential curl wget file
+
+# 2. Rust (≥ 1.96) — then open a new terminal or load it now
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# 3. Node ≥ 22.13 (via nvm) + pnpm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source "$HOME/.nvm/nvm.sh"
+nvm install 22
+corepack enable pnpm
+
+# 4. Google Chrome (automation browser on :9333) — skip if already installed
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install -y ./google-chrome-stable_current_amd64.deb
+
+# 5. Clone, install and run
+git clone https://github.com/juliannichollsc/gary.git && cd gary
+pnpm install
+pnpm tauri dev          # development window
+
+# 6. (Optional) Build your own installers
+pnpm tauri build        # → src-tauri/target/release/bundle/deb/*.deb and bundle/appimage/*.AppImage
+./scripts/repack-deb.sh # only if apt says "Cabecera de miembro del archivo inválida" (domain users with huge UIDs)
+sudo apt install ./src-tauri/target/release/bundle/deb/GARY_*_amd64.deb
+```
+Inside GARY, the Chat view opens your Ubuntu shell (bash); type `claude` / `gemini` / `opencode` there to start your agent (install the CLI first, e.g. `npm i -g @anthropic-ai/claude-code`). To (re)launch the automation browser by hand: `./engines/start-chrome-debug.sh`.
+
+> **Platforms: Windows + Ubuntu.** `pnpm tauri build` bundles for the OS it runs on — Windows → NSIS `.exe`; Ubuntu → `.deb` + `.AppImage` (Linux targets live in `src-tauri/tauri.linux.conf.json`). The chat terminal opens the OS shell (`cmd`/PowerShell on Windows, your `$SHELL` — e.g. bash — on Ubuntu). macOS is still on the roadmap.
 
 ## Responsible & respectful use
 

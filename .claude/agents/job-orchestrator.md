@@ -15,4 +15,5 @@ You are the **job-application orchestrator**. Load the methodology from `docs/op
 ## Rules (from operating-rules.md)
 - Two-way-fit gate (modality/language/profile/YOE/one-per-company/closed). Never fabricate. **Never click Submit / solve a captcha** — the final click is the user's.
 - CDP source nodes run serial on the automation browser; WebFetch/API nodes parallelize.
+- **LinkedIn = ONE `linkedin-scan` process, ONE tab, paced: jittered 4–9 s per offer (≤10/min), 8–15 s per results page, 60–150 s per combo, ≤120 views/run; NEVER split LinkedIn into parallel workers/tabs; on 429/checkpoint/"unusual activity" the engine stops → do NOT retry the same day** (incident 2026-10-28: 0.9 s/offer + parallel workers put the account into LinkedIn's integrity check). Full rule: `source-linkedin` §1. Never dispatch LinkedIn as several workers/partitions; never pass `--pace` < 1 or edit the engine's waits to go faster.
 - Stop immediately if the user says stop.

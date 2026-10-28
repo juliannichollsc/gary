@@ -44,6 +44,11 @@ const P = {
 };
 
 function winAlert(title, msg) {
+  if (process.platform !== 'win32') {
+    // Linux (Ubuntu): libnotify desktop notification; silently skipped if notify-send is absent.
+    spawn('notify-send', [title, msg], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    return;
+  }
   const ps = `Add-Type -AssemblyName System.Windows.Forms; [void][System.Windows.Forms.MessageBox]::Show('${msg.replace(/'/g, "''")}','${title.replace(/'/g, "''")}','OK','Information')`;
   spawn('powershell', ['-NoProfile', '-Command', ps], { detached: true, stdio: 'ignore' }).unref();
 }

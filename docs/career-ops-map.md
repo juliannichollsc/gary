@@ -144,6 +144,7 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
   - Full sweep: `node engines/linkedin-scan.mjs --all --tpr r604800` (past week; `--tpr r86400` = 24h).
   - Single combo: `node engines/linkedin-scan.mjs --kw "{TITLE}" --loc "{LOCATION}"` (Worldwide via
     `--geo 92000000`).
+  - **PACING (MANDATORY, built into the engine — never bypass, never parallelize):** **LinkedIn = ONE `linkedin-scan` process, ONE tab, paced: jittered 4–9 s per offer (≤10/min), 8–15 s per results page, 60–150 s per combo, ≤120 views/run; NEVER split LinkedIn into parallel workers/tabs; on 429/checkpoint/"unusual activity" the engine stops → do NOT retry the same day** (incident 2026-10-28: 0.9 s/offer + parallel workers put the account into LinkedIn's integrity check). Full rule: `source-linkedin` §1. A full sweep (titles × locations) therefore spans SEVERAL sessions — that is expected; report the remaining combos as pending, never speed up to finish.
 - **How it works:** ONE tab, serial. It **clicks each card so the detail pane loads the REAL JD**
   (navigating straight to `/jobs/view/{id}` does NOT render the JD) → reads it → runs a **zero-token
   keyword pre-filter** (auto-discards junior/intern, WordPress, .NET/C#, Java, Go/Rust/PHP/

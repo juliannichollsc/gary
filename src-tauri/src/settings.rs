@@ -101,8 +101,17 @@ fn browser_profile_dir(browser: &str) -> PathBuf {
     base.join(format!("{browser}-automation-profile"))
 }
 
+// Busca el primer comando de `names` que exista en el PATH (Linux: los paquetes .deb/snap/flatpak-export
+// instalan con nombres distintos según la distro, p. ej. `google-chrome` vs `google-chrome-stable`).
+fn which_first(names: &[&str]) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    names.iter().find_map(|n| {
+        std::env::split_paths(&path).map(|d| d.join(n)).find(|p| p.is_file())
+    })
+}
+
 // Resuelve el ejecutable del navegador elegido. Windows: rutas de instalación conocidas (solo devuelve
-// las que existen). Otros SO: nombre del comando (se resuelve en PATH al lanzar).
+// las que existen). Otros SO: el primer nombre de comando conocido que exista en el PATH.
 fn resolve_browser_exe(browser: &str) -> Option<PathBuf> {
     if cfg!(windows) {
         let pf = std::env::var("ProgramFiles").ok();
@@ -132,14 +141,14 @@ fn resolve_browser_exe(browser: &str) -> Option<PathBuf> {
         };
         cands.into_iter().flatten().find(|p| p.exists())
     } else {
-        let name = match browser {
-            "chrome" => "google-chrome",
-            "edge" => "microsoft-edge",
-            "brave" => "brave-browser",
-            "chromium" => "chromium",
+        let names: &[&str] = match browser {
+            "chrome" => &["google-chrome", "google-chrome-stable"],
+            "edge" => &["microsoft-edge", "microsoft-edge-stable"],
+            "brave" => &["brave-browser", "brave"],
+            "chromium" => &["chromium", "chromium-browser"],
             _ => return None,
         };
-        Some(PathBuf::from(name))
+        which_first(names)
     }
 }
 
@@ -200,9 +209,9 @@ pub fn start_browser(state: State<BrowserState>, app: tauri::AppHandle, browser:
     let child = match launch_browser(&browser, port, None) {
         Ok(c) => c,
         Err(e) => {
-            // Fallback solo para chrome: el .cmd legacy si el exe no se resolvió.
+            // Fallback solo para chrome en Windows: el .cmd legacy si el exe no se resolvió.
             let script = engine_script();
-            if browser == "chrome" && script.exists() {
+            if cfg!(windows) && browser == "chrome" && script.exists() {
                 hide_console(&mut Command::new("cmd")).arg("/C").arg(&script)
                     .env("GARY_BROWSER_PORT", port.to_string())
                     .spawn().map_err(|e| e.to_string())?
