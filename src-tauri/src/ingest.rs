@@ -199,8 +199,10 @@ pub async fn add_context_source(notebook_id: String, context_path: String) -> Re
 // The plugin persists cookies at %APPDATA%/notebooklm-ai/cookies.json (see the plugin's paths.ts —
 // cwd-independent). We resolve the same path to answer "are we connected?" with a pure file read.
 fn cookie_file() -> Option<PathBuf> {
+    // Same resolution as paths.ts: Windows %APPDATA%; Linux $XDG_DATA_HOME → ~/.local/share.
     let root = std::env::var("APPDATA")
         .ok()
+        .or_else(|| std::env::var("XDG_DATA_HOME").ok().filter(|s| !s.is_empty()))
         .map(PathBuf::from)
         .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local").join("share")))?;
     Some(root.join("notebooklm-ai").join("cookies.json"))

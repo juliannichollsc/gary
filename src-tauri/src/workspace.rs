@@ -36,7 +36,9 @@ pub fn bootstrap(app: &tauri::App) {
         Ok(d) => d.join("context"),
         Err(_) => return,
     };
-    if !ctx.exists() {
+    // An empty placeholder (scripts/ensure-context.mjs, for `tauri dev`) has no `.claude/` → not a
+    // real staged context → keep repo-root behavior.
+    if !ctx.join(".claude").exists() {
         return;
     }
     let ws = match app.path().app_data_dir() {

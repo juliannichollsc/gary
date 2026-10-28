@@ -29,6 +29,15 @@ Titles/locations/workType come from the filter config, not this file. Override p
 - **429 rate-limit** is the dominant risk → **keep ONE tab, SERIAL.** All combos run in a single reused
   tab, one at a time. Real parallelism is across SOURCES (a separate process may harvest Gmail), never
   multiple LinkedIn tabs (3 tabs → 429). Applying stays serial too (one Easy Apply modal at a time).
+- **MANDATORY PACING (account-integrity guard — numbers, not "gentle").** Bursts trip LinkedIn's 429 AND the
+  account **integrity/security checkpoint**. `engines/linkedin-scan.mjs` enforces, JITTERED (never fixed, never batched):
+  **open each offer/card every 4–9 s (≈8–10/min max, NEVER >1 per 4 s)** · results page → next page **8–15 s** ·
+  combo → next combo **60–150 s** · **≤120 offer views per run** (`--max-views`), the rest resumes next session via
+  `linkedin-seen.json`. `--pace 1.5` slows everything; values <1 are refused (these are the floor).
+  **NEVER launch several `linkedin-scan`/`easyapply-batch` processes at once** (one per tab/partition) — they share ONE
+  account budget. The engine **auto-STOPS** on any HTTP 429, `/checkpoint`/`/challenge`/authwall URL or "unusual activity /
+  security verification" text, saves progress and exits → the LM must NOT retry the same day: tell the user to clear the
+  check in Chrome:9333 and resume later.
 - **OAuth/login is anti-bot** → the browser is already logged in over CDP (looks human, `navigator.webdriver`
   false); never trigger a fresh Google/LinkedIn OAuth mid-run.
 - **Already-applied** → the apply script detects the "Applied" state and skips.

@@ -78,8 +78,35 @@ fn system_shell() -> String {
 // so any CLI the user launches from it loads GARY's `.claude/` skills + agents. This is the boot path.
 #[tauri::command]
 fn open_terminal(app: tauri::AppHandle, state: State<PtyState>) -> Result<(), String> {
-    let cmd = CommandBuilder::new(system_shell());
+    let mut cmd = CommandBuilder::new(system_shell());
+    // Linux/macOS: a GUI launched from the app menu has no TERM → TUIs (claude/gemini) render broken.
+    // xterm.js speaks xterm-256color + truecolor.
+    if cfg!(unix) {
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+    }
     spawn_in_pty(app, &state, cmd, ".")
+}
+
+// Linux/macOS: an app launched from the desktop menu (.desktop / AppImage) inherits the session's
+// minimal PATH, NOT the one from ~/.bashrc / ~/.profile — so `node` (nvm), `npx`, `claude`
+// (~/.local/bin), `gemini` (npm global) are not found by the engines, the NotebookLM ingest, or the
+// chat shell. Ask the user's login+interactive shell for its PATH once at startup and adopt it.
+// Windows reads PATH from the registry for GUI apps, so it's a no-op there.
+#[cfg(unix)]
+fn import_login_shell_path() {
+    const MARK: &str = "__GARY_PATH__=";
+    let Ok(out) = std::process::Command::new(system_shell())
+        .args(["-ilc", &format!("printf '{MARK}%s' \"$PATH\"")])
+        .stdin(std::process::Stdio::null())
+        .output()
+    else { return };
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    if let Some(path) = stdout.rsplit_once(MARK).map(|(_, p)| p.trim()) {
+        if path.contains('/') {
+            std::env::set_var("PATH", path);
+        }
+    }
 }
 
 // Spawn a concrete CLI (e.g. "gemini", "claude", "opencode") in a PTY rooted at `cwd`. Kept for
@@ -110,6 +137,9 @@ fn resize_pty(state: State<PtyState>, rows: u16, cols: u16) -> Result<(), String
 }
 
 fn main() {
+    #[cfg(unix)]
+    import_login_shell_path();
+
     tauri::Builder::default()
         .manage(PtyState { writer: Mutex::new(None), master: Mutex::new(None) })
         .manage(BrowserState::default())

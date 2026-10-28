@@ -101,6 +101,7 @@ running the user's terminal LM CLI, which loads `.claude/skills` + `.claude/agen
 - **Concurrency:** CDP channels (LinkedIn/GetOnBoard/Himalayas/…) run **serial** on the one browser;
   WebFetch/API channels (Gmail-triage, board APIs, Indeed/Computrabajo) **parallelize**. Parallelism is
   across SOURCES, not multiple tabs of one site (3 LinkedIn tabs → 429).
+- **LinkedIn anti-block pacing (MANDATORY):** **LinkedIn = ONE `linkedin-scan` process, ONE tab, paced: jittered 4–9 s per offer (≤10/min), 8–15 s per results page, 60–150 s per combo, ≤120 views/run; NEVER split LinkedIn into parallel workers/tabs; on 429/checkpoint/"unusual activity" the engine stops → do NOT retry the same day** (incident 2026-10-28: 0.9 s/offer + parallel workers put the account into LinkedIn's integrity check). Full rule: `source-linkedin` §1.
 - **Per-board specifics** (LinkedIn EasyApply, Gmail alerts, Himalayas Cloudflare, GetOnBoard early-stop,
   Computrabajo/Indeed/xpertdirect/tecla/vanhack) → each `source-*` / `*-offers` skill + `docs/operating-rules.md` §4.
 - **Login once per site** in the automation browser (persists in its profile). Google OAuth is usually blocked

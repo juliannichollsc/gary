@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": ["deb", "appimage"],
+    "category": "Utility",
+    "shortDescription": "Desktop copilot for job hunting",
+    "linux": {
+      "deb": {
+        "section": "utils"
+      }
+    }
+  }
+}

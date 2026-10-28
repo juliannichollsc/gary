@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GARY",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "dev.gary.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "node scripts/ensure-context.mjs && pnpm dev",
     "beforeBuildCommand": "pnpm build && node scripts/bundle-context.mjs"
   },
   "app": {
