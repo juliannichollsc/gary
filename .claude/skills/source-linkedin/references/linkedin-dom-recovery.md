@@ -5,7 +5,17 @@
 > `scanCombo` (the `--all` filters/roles sweep) and `scanUrls` (the Gmail-harvested `--urls` path).
 > Read this when a LinkedIn sweep returns `scanned 0`, empty JDs, or a `writeSeen` crash.
 
-## 1. The JD renders ONLY in the search split-view (`currentJobId`) — NOT `/jobs/view/{id}`
+## 1. Standalone (Gmail) offers: open the e-mail's own link — NOT a crafted `currentJobId` URL
+> **2026-11-13 (owner order — anti-detection):** `scanUrls` now opens each offer through the alert e-mail's OWN
+> link (`/comm/jobs/view/{id}/?trackingId=…`, fallback `/jobs/view/{id}/`) with Gmail as the referrer, reads the
+> page like a person (`readLikeAPerson`: wheel scrolls + "…more"), then scrapes with the 2026-11 fallbacks
+> (`[data-testid="expandable-text-box"]` + `document.title`). Building `/jobs/search/?currentJobId={id}` for every
+> offer landed on LinkedIn's AI-powered search (toast "You're now using AI-powered job search") over and over — a
+> bot signature. The split-view path below is HISTORY, kept only as the opt-in `--split-view`. If the e-mail link
+> stops rendering a JD, `--fail-limit` (default 3) aborts with `ENGINE-SELECTOR-STALE` after ≤3 views → inspect
+> ONE offer's live DOM and fix the selectors; do NOT go back to crafted split-view URLs by default.
+
+### History (pre-2026-11-13): the JD rendered ONLY in the search split-view
 **Symptom:** the bot navigates fine (`nav ~1.6s`) but every JD comes back empty (`jd@final=0`), so the
 run reports `scanned 0 | 0 survivors` and marks nothing seen. A CDP probe shows the offer title in
 `document.title` (so you ARE logged in) but `#job-details`, `.jobs-description__content`, `h1`, and even
@@ -17,7 +27,7 @@ NOT hydrate the job-detail pane. The `#job-details` pane only mounts in the SEAR
 **Fix (already in the engine):**
 - `scanCombo` gets this for free — it CLICKS a card in `/jobs/search`, which lands on
   `…/jobs/search/?currentJobId={id}` and mounts the pane.
-- `scanUrls` (standalone Gmail URLs) must NOT `goto('/jobs/view/{id}')`. `loadUrls` rebuilds every id as
+- (history) `scanUrls` did not `goto('/jobs/view/{id}')`. `loadUrls` rebuilds every id as
   `https://www.linkedin.com/jobs/search/?currentJobId={id}`, and the id is re-extracted with
   `url.match(/currentJobId=(\d+)|\/jobs\/view\/(\d+)/)`. The canonical `/jobs/view/{id}/` URL is kept only
   for the offers-map record.
@@ -32,8 +42,8 @@ NOT hydrate the job-detail pane. The `#job-details` pane only mounts in the SEAR
 `scrapeDetail()` picks stable-id-first (`#job-details`) then GENERIC `[class*="jobs-description"]` /
 `[class*="unified-top-card__…"]` fallbacks, so a LinkedIn class RENAME keeps matching. If the pane stops
 rendering ENTIRELY (a real layout change), the engine does not silently burn the batch:
-- `scanUrls` counts consecutive empty JDs; after `--fail-limit` in a row (default **8**, i.e. "5–10
-  seguidos") it ABORTS and prints **`ENGINE-SELECTOR-STALE`**.
+- `scanUrls` counts consecutive empty JDs; after `--fail-limit` in a row (default **3** since 2026-11-13 —
+  each empty read is a view of the user's account) it ABORTS and prints **`ENGINE-SELECTOR-STALE`**.
 - **That message is the signal for the LM supervisor** (supervisor case #1 — unexpected engine error) to
   open one offer over CDP, inspect the live DOM, refresh the `pick([...])` selector lists + the
   `waitForSelector` string, then re-run. Update this doc with the new class names when you do.

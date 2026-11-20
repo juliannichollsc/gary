@@ -23,7 +23,8 @@
   - Apply the ≤1-week recency rule (posted within 7 days) unless the user widens the window.
 
   CHANNELS: A=LinkedIn EasyApply · B=Manual (GetOnBoard/Computrabajo/etc.) · C=LinkedIn-via-Gmail
-            · D=Himalayas · (add more as boards are wired). One section per channel.
+            · D=Himalayas · W=Web (company career pages, in-session LM search) · (add more as boards are
+            wired). One section per channel.
 -->
 
 # Offers Master — every offer to apply to (consolidated, all channels)
@@ -50,6 +51,8 @@
 | B · Manual (GetOnBoard / Computrabajo / …) | 0 | not run |
 | C · LinkedIn via Gmail alerts | 0 | not run |
 | D · Himalayas | 0 | not run |
+| E · Session boards (Dice / Hireline / Glassdoor / Dover) | 0 | not run |
+| W · Web — company career pages (in-session LM search) | 0 | not run |
 | **Applied total** | **0** | nothing applied (never auto-submit) |
 | **Actionable, not yet applied** | **0** | — |
 
@@ -64,3 +67,18 @@ _(not run)_
 
 ## CANAL D — Himalayas
 _(not run)_
+
+## CANAL Dice
+_(not run — `node engines/board-sweep.mjs --site dice`)_
+
+## CANAL Hireline
+_(not run — `node engines/board-sweep.mjs --site hireline`)_
+
+## CANAL Glassdoor
+_(not run — `node engines/board-sweep.mjs --site glassdoor`)_
+
+## CANAL Dover
+_(not run — `node engines/dover-jobs.mjs` — map only, the user applies on each offer's own form)_
+
+## CANAL Web
+_(not run — in-session LM web search on company career pages, skill `source-web`; no bots, never in background. Rows: `- [ ] **{Company}** — {Role} — {score} — {company-page url} — Web — {modality · location · posted date} — apply: manual`)_

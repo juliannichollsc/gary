@@ -13,7 +13,7 @@
 |--------|----------|-----|
 | **Name / mark** | GARY + the official dog/husky face isotipo | A copilot that *hunts* jobs — the frontal canine mark is distinctive, trustworthy, and immediately ties the product to the companion metaphor. |
 | **Personality** | Calm competence. Friendly, never cute-to-a-fault. Speaks plainly, shows its work, never oversells. | It handles a stressful task (job hunting). Trust > flash. |
-| **Tone in UI copy** | Spanish or English, short, encouraging, honest about limits ("GARY no envía; el click final es tuyo"). | Matches the operating rules (§2, §6) and reduces user anxiety. |
+| **Tone in UI copy** | Spanish or English, short, encouraging, honest about limits ("GARY se detiene antes de Enviar; el click final es tuyo" — and say so when a channel is the exception, e.g. Computrabajo auto-applies). | Matches the operating rules (§2, §6) and reduces user anxiety. |
 | **Style family** | **Warm dark-first product UI** — flat surfaces, soft elevation, one amber accent, generous whitespace, and richer brown neutrals inspired by the isotipo. | Reads professional without looking generic; the warmth comes from the mark, palette, and restrained motion. |
 | **Mascot usage** | The isotipo appears as: the app avatar in the sidebar, GARY's chat message avatar, the onboarding hero, and a subtle loading mark. Used **with restraint** — never as a structural/nav icon (those are line icons). | `no-emoji-icons`: emoji are not used for controls; the isotipo is the brand asset and should be rendered from the official image/SVG source, not replaced with the 🐾 glyph in product UI. |
 
@@ -51,7 +51,7 @@ and the CTA unmistakable (`primary-action`).
 | `--surface`         | `#1B1412` | `#FFFFFF` | Cards, panels, sidebar |
 | `--surface-2`       | `#241A17` | `#F5ECE6` | Raised: chat input, modal, popover |
 | `--surface-3`       | `#31211B` | `#EAD7CB` | Hover surface, code blocks |
-| `--border`          | `#4A2C20` | `#D6BEB3` | Hairline dividers, card borders |
+| `--border`          | `#3A2A23` | `#E4D5CC` | Hairline dividers, card borders (softened: separation comes from spacing first) |
 | `--border-strong`   | `#6A3B28` | `#C26942` | Input borders, focus-adjacent |
 | `--text`            | `#F3F3F3` | `#1B1412` | Primary text (≥ 4.5:1 on bg/surface) |
 | `--text-secondary`  | `#D6C5BD` | `#5D463D` | Secondary/labels (≥ 3:1) |
@@ -90,6 +90,10 @@ variable Google fonts (`font-loading: swap`).
 | **UI / headings / body** | **Inter** (or system fallback) | Neutral, highly legible at small sizes, great for dense desktop UI. |
 | **Brand wordmark / hero** | **Plus Jakarta Sans** (600/700) | Slightly rounder, warmer — used only for "GARY" wordmark and big empty-state headings. |
 | **Mono (terminal, code, JD snippets, scores)** | **JetBrains Mono** | The chat is a terminal underneath; mono ties the two worlds. Also `number-tabular` for scores/comp. |
+
+Fonts are **bundled** (`@fontsource-variable/inter`, `…/plus-jakarta-sans`, `…/jetbrains-mono`, imported in
+`src/main.tsx`) — no Google Fonts request, so GARY renders identically offline and without a fallback flash.
+xterm draws on canvas and can't resolve `var()`: pass it the **resolved** `--font-mono` value.
 
 ### Type scale (desktop, base 16px, `font-scale`, line-height `line-height` 1.5)
 
@@ -172,7 +176,7 @@ Touch/click targets ≥ 36px desktop (≥44 where the same UI may be touched); 8
 | **App boot** | Paw mark draws in (SVG stroke via DrawSVG-style), wordmark fades up 8px. | 420ms, `power2.out`, once |
 | **Chat message in** | User msg slides from right +8px/fade; GARY msg from left +8px/fade. | 180ms `power2.out` |
 | **Streaming / "escribiendo"** | 3-dot paw-amber bounce (staggered 120ms) + soft caret blink in the bubble. | loop, 1.0s |
-| **Sidebar nav switch** | Active accent pill morphs to the new item (shared-element via Flip); content crossfades. | pill 260ms `power3.inOut`, content 140ms crossfade |
+| **Sidebar nav switch** | ONE shared `.nav__pill` slides to the active item (GSAP on `offsetTop`/height); content crossfades. | pill 260ms `power3.inOut`, content 140ms crossfade |
 | **Connection status → connected** | Dot scales 0.6→1 with a tiny overshoot + check draws in; row flashes `--success-soft`. | 300ms `back.out(2)` |
 | **Onboarding progress** | Progress bar tweens width; step dots fill + check stamp (CustomBounce-lite). | width 500ms `power2.out` |
 | **Offer row reveal** | Stagger rows in on load/filter (30–50ms each, `stagger-sequence`); score meter dots fill left→right. | 40ms stagger, dots 250ms |
@@ -193,7 +197,7 @@ A global `motion` token set keeps duration/easing consistent everywhere (`motion
 - Form fields: visible label, helper text, inline validation on blur, error below field + `role="alert"`, focus moves to first invalid field (`form-labels`, `inline-validation`, `error-placement`, `focus-management`).
 - `prefers-reduced-motion` fully honored; text scales without breaking layout (`dynamic-type`).
 - Live regions: streaming chat + toasts announced politely without grabbing focus (`toast-accessibility`).
-- The Submit guardrail is also an a11y/clarity feature: a persistent, high-contrast notice "GARY no envía — el click final es tuyo" on every apply surface.
+- The Submit guardrail is also an a11y/clarity feature: a persistent notice on every apply surface stating the TRUE behavior — "GARY llena hasta Enviar y se detiene; el click final es tuyo. Excepción: Computrabajo, que postula automáticamente con tus filtros." Per-offer (drawer), Computrabajo offers show the auto-apply rule instead of the generic guard. Never claim "GARY no envía" unconditionally.
 
 ---
 
@@ -212,7 +216,8 @@ Full spec + props in [`docs/components.md`](./components.md).
 
 Tokens ship as CSS custom properties on `:root` (dark default) and `[data-theme="light"]`. The Dark/Light
 toggle flips `data-theme` and persists to settings; GSAP reads the same `--accent` so motion stays on-theme.
-The xterm chat theme is derived from the same tokens (bg `--bg`, fg `--text`, accent cursor) so the embedded
-terminal and the chat skin look like one surface.
+The xterm chat theme is derived from the same tokens (bg `--bg`, fg `--text`, accent cursor) **plus the full
+16-color ANSI palette** (`--term-{black,red,green,yellow,blue,magenta,cyan,white}` and `--term-bright-*`, one
+set per theme) so CLI/engine output reads on-brand instead of xterm's stock primaries.
 </content>
 </invoke>

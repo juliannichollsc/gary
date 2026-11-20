@@ -9,13 +9,15 @@
 // Himalayas job DETAIL pages sit behind a Cloudflare "Just a moment..." bot challenge that
 // AUTO-CLEARS in ~4s inside the real logged-in browser — so JD extraction POLLS until the
 // challenge clears (don't extract on the 1st tick or you capture the challenge page).
-// Anti-block cadence: JD pages are fetched with concurrency=2 and a ~2s gap between batches
-// (mirrors the "max 2 bots / 2s" rule even though CDP is low-risk).
+// Anti-block cadence: ONE JD page at a time (one tab per site), jittered 4–9 s between opens.
 // Incremental + resumable: himalayas-jobs.json is rewritten after every batch; a re-run skips
 // jobs already captured with a real (non-blocked) description.
 // Usage: node engines/himalayas-matches.mjs [--max-pages N] [--no-desc] [--fresh]
 import { chromium } from 'playwright';
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { acquireSiteLock } from './_site-lock.mjs';
+import { breathe, machinePace } from './_machine-guard.mjs';
+await acquireSiteLock('himalayas.app');   // ONE bot per site + machine budget (anti-block, anti-freeze) — see _site-lock.mjs
 
 const CDP = process.env.CDP_URL || 'http://127.0.0.1:9333';
 const argv = process.argv.slice(2);
@@ -23,7 +25,7 @@ const maxPagesArg = (() => { const i = argv.indexOf('--max-pages'); return i >= 
 const NO_DESC = argv.includes('--no-desc');
 const MATCH_RE = /\/companies\/[^/]+\/jobs\/[^/?#]+/;
 const BASE = 'https://himalayas.app/jobs/matches';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = async (ms) => { await new Promise((r) => setTimeout(r, ms * machinePace())); await breathe(); };   // + machine back-off
 
 let browser;
 try { browser = await chromium.connectOverCDP(CDP); }
@@ -87,7 +89,7 @@ const jobs = [...byUrl.values()];
 writeFileSync('output/gmail-harvest/himalayas-matches.txt', jobs.map((j) => j.url).join('\n') + '\n');
 console.log(`Mapped ${jobs.length} unique matches → himalayas-matches.txt`);
 
-// --- 3. capture JD description per job (concurrency 2, ~2s gap, Cloudflare-aware, resumable) ---
+// --- 3. capture JD description per job (serial, 4–9 s jitter, Cloudflare-aware, resumable) ---
 const OUT = 'output/gmail-harvest/himalayas-jobs.json';
 const FRESH = argv.includes('--fresh');
 const BLOCKED_RE = /just a moment|verification|attention required|verifying you are/i;
@@ -121,18 +123,32 @@ if (!NO_DESC) {
   };
 
   const todo = jobs.filter(j => !j.description);
-  for (let i = 0; i < todo.length; i += 2) {
-    await Promise.all(todo.slice(i, i + 2).map(extract));
-    done = Math.min(i + 2, todo.length);
+  // ONE JD page at a time (one tab per site), jittered 4–9 s between opens — anti-block rule.
+  for (let i = 0; i < todo.length; i++) {
+    await extract(todo[i]);
+    done = i + 1;
     writeFileSync(OUT, JSON.stringify(jobs, null, 2)); // incremental save → resumable
     const ok = jobs.filter(j => j.description && !j.description.startsWith('ERROR')).length;
     console.log(`  JD ${done}/${todo.length} (ok total ${ok}/${jobs.length})`);
-    if (i + 2 < todo.length) await sleep(2000);
+    if (i + 1 < todo.length) await sleep(4000 + Math.random() * 5000);
   }
 }
 
+// ≤N-day recency (owner order 2026-11-10: max 1 week). Each JD carries "Posted on <Mon D[, YYYY]>": stamp postedDays
+// and flag stale > --max-age (default 7) so the LM triage never scores an old offer. No date → kept (postedDays null).
+const MAX_AGE = (() => { const i = argv.indexOf('--max-age'); return i >= 0 ? parseInt(argv[i + 1], 10) : 7; })();
+let staleN = 0;
+for (const j of jobs) {
+  const m = (j.description || '').match(/Posted on\s*\n?\s*([A-Z][a-z]+ \d{1,2}(?:, \d{4})?)/);
+  if (!m) { j.postedDays = null; continue; }
+  const now = new Date(); let d = new Date(/\d{4}/.test(m[1]) ? m[1] : `${m[1]}, ${now.getFullYear()}`);
+  if (d > now) d.setFullYear(d.getFullYear() - 1);                       // "Dec 28" read in January → last year
+  j.postedDays = Number.isNaN(+d) ? null : Math.floor((now - d) / 86400000);
+  j.stale = j.postedDays != null && j.postedDays > MAX_AGE;
+  if (j.stale) staleN++;
+}
 writeFileSync(OUT, JSON.stringify(jobs, null, 2));
 const okN = jobs.filter(j => j.description && !j.description.startsWith('ERROR')).length;
-console.log(`Saved → ${OUT} (${jobs.length} jobs, ${okN} with real JD${NO_DESC ? ' [no-desc mode]' : ''})`);
+console.log(`Saved → ${OUT} (${jobs.length} jobs, ${okN} with real JD${NO_DESC ? ' [no-desc mode]' : ''}; ${staleN} stale > ${MAX_AGE} d → flagged, triage must skip them)`);
 await page.close().catch(() => {});
 await browser.close();

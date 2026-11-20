@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Loader } from "../icons";
 import { useT } from "../i18n";
 
-const SITES = ["LinkedIn", "Gmail", "GetOnBoard", "Himalayas", "Indeed", "Computrabajo"];
+const SITES = ["LinkedIn", "Gmail", "GetOnBoard", "Himalayas", "Indeed", "Computrabajo", "Dice", "Hireline", "Glassdoor", "Dover"];
 
 export function FilterPreflight({ onDone }: { onDone: () => void }) {
   const t = useT();

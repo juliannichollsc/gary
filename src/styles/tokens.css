@@ -2,8 +2,8 @@
    Dark is the default (:root); light is a first-class peer ([data-theme="light"]).
    Components must reference these variables — never raw hex. */
 
-/* Fonts (variable, display=swap) */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+/* Fonts: bundled variable fonts (@fontsource-variable/*, imported in main.tsx) so GARY renders the same
+   offline — no Google Fonts request, no fallback flash at boot. */
 
 :root {
   /* Accent — warm amber kept in both themes */
@@ -18,7 +18,7 @@
   --surface: #1b1412;
   --surface-2: #241a17;
   --surface-3: #31211b;
-  --border: #4a2c20;
+  --border: #3a2a23;        /* hairlines: cálido pero menos saturado → menos "marco" en cada superficie */
   --border-strong: #6a3b28;
   --text: #f3f3f3;
   --text-secondary: #d6c5bd;
@@ -36,9 +36,9 @@
   --info-soft: rgba(215, 176, 138, 0.16);
 
   /* Typography */
-  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-brand: "Plus Jakarta Sans", var(--font-ui);
-  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+  --font-ui: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-brand: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", var(--font-ui);
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
 
   /* Spacing — 4/8 rhythm */
   --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
@@ -59,7 +59,22 @@
   --dur-fast: 120ms; --dur: 160ms; --dur-slow: 260ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
+  /* Terminal ANSI palette (xterm) — derived from the brand ramp so CLI/engine output reads on-theme
+     instead of xterm's stock primaries. Bright = one step lighter. */
+  --term-black: #241a17;   --term-bright-black: #6a5a52;
+  --term-red: #e17e67;     --term-bright-red: #eea08d;
+  --term-green: #79c27a;   --term-bright-green: #9bd69b;
+  --term-yellow: #ce812d;  --term-bright-yellow: #dea152;
+  --term-blue: #8fa8c8;    --term-bright-blue: #b1c4dc;
+  --term-magenta: #c49ab8; --term-bright-magenta: #d8b8cf;
+  --term-cyan: #8cbcb4;    --term-bright-cyan: #aed3cc;
+  --term-white: #d6c5bd;   --term-bright-white: #f3f3f3;
+
+  /* Chevron de <select> (SVG en data URI: no puede leer var() → un valor por tema) */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a09f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
   --sidebar-w: 260px;
+  --content-w: 880px; /* ancho de lectura ÚNICO para Perfil, Métricas y Ajustes (bordes alineados) */
   color-scheme: dark;
 }
 
@@ -74,7 +89,7 @@
   --surface: #ffffff;
   --surface-2: #f5ece6;
   --surface-3: #ead7cb;
-  --border: #d6beb3;
+  --border: #e4d5cc;
   --border-strong: #c26942;
   --text: #1b1412;
   --text-secondary: #5d463d;
@@ -90,6 +105,16 @@
   --elev-2: 0 10px 26px rgba(91, 59, 43, 0.12);
   --elev-3: 0 20px 52px rgba(91, 59, 43, 0.18);
   --scrim: rgba(44, 24, 15, 0.34);
+
+  --term-black: #1b1412;   --term-bright-black: #786a63;
+  --term-red: #b3473a;     --term-bright-red: #c4614f;
+  --term-green: #2f7d4b;   --term-bright-green: #3d9460;
+  --term-yellow: #9a5a12;  --term-bright-yellow: #b3623d;
+  --term-blue: #3d5f8a;    --term-bright-blue: #5276a3;
+  --term-magenta: #8a4f7a; --term-bright-magenta: #a3668f;
+  --term-cyan: #2f7a72;    --term-bright-cyan: #3f9187;
+  --term-white: #5d463d;   --term-bright-white: #1b1412;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23786a63' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 

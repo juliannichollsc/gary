@@ -7,6 +7,8 @@
 // Usage:   node engines/linkedin-enrich.mjs output/gmail-harvest/clean-linkedin-2026-06-24.txt
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { acquireSiteLock } from './_site-lock.mjs';
+await acquireSiteLock('linkedin.com');   // ONE bot per site + machine budget (anti-block, anti-freeze) — see _site-lock.mjs
 
 const listFile = process.argv[2];
 if (!listFile) { console.error('Usage: node engines/linkedin-enrich.mjs <urls.txt>'); process.exit(1); }
@@ -45,4 +47,5 @@ mkdirSync('output/gmail-harvest', { recursive: true });
 const out = listFile.replace(/\.txt$/, '') + '-enriched.json';
 writeFileSync(out.includes('/') ? out : 'output/gmail-harvest/' + out, JSON.stringify(results, null, 2));
 console.log(`\nSaved → ${out}`);
+await page.close().catch(() => {});   // close OUR tab (leftover tabs eat RAM)
 await browser.close();

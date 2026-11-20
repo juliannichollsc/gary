@@ -6,7 +6,7 @@ use tauri::Manager;
 
 use crate::settings::project_root;
 
-const SOURCES: [&str; 6] = ["LinkedIn", "Gmail", "Indeed", "GetOnBoard", "Himalayas", "Computrabajo"];
+const SOURCES: [&str; 12] = ["LinkedIn", "Gmail", "Indeed", "GetOnBoard", "Himalayas", "Computrabajo", "Dice", "Hireline", "Glassdoor", "Dover", "ATS", "Web"];
 
 // Parse `data/metrics.md` "## Hunts" rows → { hunts: Hunt[] } (matches src/metrics.ts). Empty if no rows.
 // Row: `- {date} — {model} — tokens={T} — total={N} — real={M} — LinkedIn:a, Gmail:b, …`
@@ -21,12 +21,19 @@ pub fn read_metrics() -> Value {
         if !in_hunts || !t.starts_with("- ") { continue; }
         let parts: Vec<&str> = t.trim_start_matches("- ").split(" — ").map(|s| s.trim()).collect();
         if parts.len() < 6 { continue; }
-        let num = |p: &str, pre: &str| p.strip_prefix(pre).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+        // Tolerant: "32,819" / "32.819" / "60k" / "~60000" all parse (an LM-written row must never silently read 0).
+        let int = |s: &str| -> i64 {
+            let t = s.trim().trim_start_matches('~').to_lowercase();
+            let (body, mul) = if let Some(b) = t.strip_suffix('k') { (b, 1000.0) } else if let Some(b) = t.strip_suffix('m') { (b, 1_000_000.0) } else { (t.as_str(), 1.0) };
+            if mul > 1.0 { return (body.replace(',', ".").parse::<f64>().unwrap_or(0.0) * mul) as i64; }
+            body.chars().filter(|c| c.is_ascii_digit()).collect::<String>().parse::<i64>().unwrap_or(0)
+        };
+        let num = |p: &str, pre: &str| p.strip_prefix(pre).map(int).unwrap_or(0);
         let mut by = serde_json::Map::new();
         for s in SOURCES { by.insert(s.to_string(), json!(0)); }
         for kv in parts[5].split(',') {
             if let Some((k, v)) = kv.trim().split_once(':') {
-                if let Ok(n) = v.trim().parse::<i64>() { by.insert(k.trim().to_string(), json!(n)); }
+                if v.trim().chars().any(|c| c.is_ascii_digit()) { by.insert(k.trim().to_string(), json!(int(v))); }
             }
         }
         hunts.push(json!({
@@ -38,21 +45,31 @@ pub fn read_metrics() -> Value {
     json!({ "hunts": hunts })
 }
 
-// Map any text (a URL host or a section header) to one of the 6 UI channels. Order matters so a
+// Map any text (a URL host or a section header) to one of the UI channels. Order matters so a
 // "LinkedIn via Gmail alerts" header/URL resolves to LinkedIn (checked before Gmail). Returns None if
 // nothing matches so the caller can fall back to the section header.
 fn channel_of(s: &str) -> Option<&'static str> {
     let l = s.to_lowercase();
-    if l.contains("computrabajo") { Some("Computrabajo") }
+    // Web = in-session LM web search on company career pages (`## CANAL Web` header only — never by URL,
+    // a company page can live on any host, incl. an ATS host).
+    if l.contains("canal web") { Some("Web") }
+    else if l.contains("computrabajo") { Some("Computrabajo") }
     else if l.contains("himalayas") { Some("Himalayas") }
     else if l.contains("getonbrd") || l.contains("getonboard") { Some("GetOnBoard") }
+    else if l.contains("glassdoor") { Some("Glassdoor") }
+    // Dover = the jobs.dover.com board (`?jobId=` URLs) or its `## CANAL Dover` header — never the bare word
+    // "dover" (a company called Dover can show up in any channel's row).
+    else if l.contains("jobs.dover.com") || l.contains("canal dover") { Some("Dover") }
+    else if l.contains("hireline") { Some("Hireline") }
+    else if l.contains("dice.com") || l.contains("canal dice") { Some("Dice") }
     else if l.contains("indeed") { Some("Indeed") }
     else if l.contains("linkedin") { Some("LinkedIn") }
     else if l.contains("gmail") { Some("Gmail") }
-    // ATS = zero-token 16-provider scanner (engines/scan.mjs). Resolve by ATS host, or the `## CANAL ATS` header.
+    // ATS = zero-token 18-provider scanner (engines/scan.mjs). Resolve by ATS host, or the `## CANAL ATS` header.
     else if l.contains("greenhouse.io") || l.contains("ashbyhq.com") || l.contains("lever.co")
          || l.contains("workable.com") || l.contains("smartrecruiters.com") || l.contains("recruitee.com")
-         || l.contains("myworkdayjobs.com") || l.contains("workday") || l.contains("canal ats") { Some("ATS") }
+         || l.contains("myworkdayjobs.com") || l.contains("workday") || l.contains("workingnomads.com")
+         || l.contains("jobspresso.co") || l.contains("canal ats") { Some("ATS") }
     else { None }
 }
 
@@ -86,7 +103,9 @@ pub fn read_offers() -> Value {
             .find_map(|p| p.parse::<f64>().ok()).unwrap_or(0.0);
         let url = parts.get(url_idx).copied().unwrap_or("");
         let notes = parts.get(url_idx + 1..).map(|s| s.join(" — ")).unwrap_or_default();
-        let channel = channel_of(url).or(section_channel).unwrap_or("");
+        // Under `## CANAL Web` the section wins: those rows point at company pages that often live on an ATS
+        // host (greenhouse/lever/…), which would otherwise resolve to the ATS channel.
+        let channel = if section_channel == Some("Web") { "Web" } else { channel_of(url).or(section_channel).unwrap_or("") };
         offers.push(json!({
             "id": format!("o{}", offers.len() + 1),
             "company": company,
@@ -213,4 +232,17 @@ pub fn set_onboarding(app: tauri::AppHandle, onboarding: Value) -> Result<(), St
     let path = onboarding_path(&app)?;
     let json = serde_json::to_string_pretty(&onboarding).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::channel_of;
+
+    #[test]
+    fn web_resolves_only_from_its_section_header() {
+        assert_eq!(channel_of("## CANAL Web — páginas de empresa"), Some("Web"));
+        // a company page on any host never resolves to Web by URL (read_offers keeps the section instead)
+        assert_eq!(channel_of("https://webflow.com/careers/123"), None);
+        assert_eq!(channel_of("https://boards.greenhouse.io/acme/jobs/1"), Some("ATS"));
+    }
 }

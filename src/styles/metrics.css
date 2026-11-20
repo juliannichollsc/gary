@@ -6,7 +6,7 @@
   min-height: 0;
   overflow-y: auto;
   width: 100%;
-  max-width: 960px;
+  max-width: var(--content-w);
   margin: 0 auto;
   padding: var(--space-8) var(--space-6);
   display: flex;
@@ -20,29 +20,29 @@
 .metrics__sectionhint { font-size: 13px; color: var(--text-muted); margin: 0; }
 
 /* ---------- Overview cards ---------- */
+/* Una sola franja con divisores (no 5 tarjetas sueltas): se lee como un resumen, no como un kit de cards,
+   y nunca deja una tarjeta huérfana en una segunda fila. */
 .metrics__overview {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-4);
-}
-.statcard {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-5);
+  overflow: hidden;
+}
+.statcard {
+  padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  box-shadow: -1px 0 0 var(--border); /* divisor izquierdo; el overflow del contenedor recorta el del 1º */
 }
-.statcard__label {
-  font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
+.statcard__label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
 .statcard__value {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-  font-size: 30px; font-weight: 500; line-height: 1.1; color: var(--text);
+  font-size: 28px; font-weight: 500; line-height: 1.15; color: var(--text);
 }
-.statcard__hint { font-size: 12px; color: var(--text-secondary); }
+.statcard__hint { font-size: 14px; color: var(--text-muted); margin-left: 4px; }
 .statcard--accent .statcard__value { color: var(--accent); }
 
 /* ---------- JobsBySourceChart (barras horizontales) ---------- */
@@ -110,9 +110,18 @@
 .qhistory__real { color: var(--accent); font-weight: 500; }
 .qhistory__total { color: var(--text-muted); }
 .qhistory__sep { color: var(--text-muted); }
+.qhistory__warn { color: var(--warning, var(--accent)); margin-left: 6px; cursor: help; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .chart__row { grid-template-columns: 90px 1fr 40px; }
   .qhistory__model { display: none; }
+}
+
+/* ---------- Actual vs Anteriores ---------- */
+.metrics > .segmented { align-self: flex-start; }
+.metrics__caption {
+  margin: calc(var(--space-4) * -1) 0 0; /* pegado a las pestañas: describe la consulta que se muestra */
+  font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary);
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
 }

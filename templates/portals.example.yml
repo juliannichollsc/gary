@@ -1237,6 +1237,17 @@ tracked_companies:
     notes: "Istanbul. E-commerce marketplace (Doğuş Group)."
     enabled: false
 
+# ── ATS registry (large, rotating) ─────────────────────────────────────
+# ~15k companies whose jobs live on Greenhouse / Lever / Ashby (public MIT slug lists, cached in
+# output/ats-registry/ — see engines/ats-registry.mjs). Each scan takes a rotating slice: boards that had
+# remote jobs (every run), never-scanned boards, then boards without remote jobs (every 14 days).
+# Same title_filter / location / dedup as tracked_companies. 0 tokens.
+
+ats_registry:
+  enabled: true
+  max_companies: 1500
+  providers: [greenhouse, lever, ashby]
+
 # ── Job Boards ────────────────────────────────────────────────────────
 # Multi-employer aggregators. Unlike tracked_companies (one entry = one employer),
 # job boards return offers from many companies in a single API call.
@@ -1295,3 +1306,18 @@ job_boards:
     provider: solidjobs
     enabled: false
     notes: "Polish job board — Other specialists division"
+
+  # ── Remote job boards (free, no auth, no membership) ───────────────
+  # Region-lock §1 is applied downstream over the returned `location`.
+
+  - name: Working Nomads
+    careers_url: https://www.workingnomads.com/api/exposed_jobs/
+    provider: workingnomads
+    enabled: true
+    notes: "Remote board — public JSON API (latest postings, all categories)"
+
+  - name: Jobspresso
+    careers_url: https://jobspresso.co/?feed=job_feed
+    provider: jobspresso
+    enabled: true
+    notes: "Curated remote board — public RSS (WP Job Manager; optional &search_keywords=)"

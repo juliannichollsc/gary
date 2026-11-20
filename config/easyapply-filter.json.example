@@ -12,6 +12,17 @@
     { "loc": "European Union" },
     { "loc": "United Kingdom" }
   ],
+  "city": "{{CITY_OF_RESIDENCE}}",
+  "_location_scenarios": "DERIVE from the onboarding answers (RAG / gary-context.md → Ubicación + Modalidad aceptada); if missing, ASK before mapping. REMOTE-only → workType '2', locations = [country of residence, its wider region (e.g. Latin America), Worldwide]; ON-SITE-only → workType '1', locations = [CITY of residence], city = that city; HYBRID-only → workType '3', locations = [CITY], city = that city; MIXED (remote + on-site/hybrid) → workType '1,2,3' (or the accepted subset), locations = remote regions + the city, city = that city (on-site/hybrid cards outside it are skipped, remote cards are judged by region in triage). The user moved → update the RAG answer and regenerate this file.",
+  "linkedinFilters": {
+    "_note": "OPTIONAL — LinkedIn 2026-11 conversational search maps like a person: engines/linkedin-scan.mjs TYPES title + zone (from `titles` × `locations`) and ticks ONLY Date posted = Past week; modality (`workType`) is read from each card's text, never asked of LinkedIn; EVERY offer is mapped and Easy Apply is only a FLAG (apply: auto = auto-apply, apply: manual = the user applies by hand) — `easyApplyOnly: true` is an explicit opt-in to skip non-Easy-Apply cards. Everything below is OFF by default (fewer clicks = less to detect); set it only if the user explicitly asks: `experience` (Entry-level | Senior | Manager | Director | Executive), `employment` (Full-time | Part-time | Contract | Internship | Volunteer), `tags` ('auto' or a list of LinkedIn's AI-suggested tags).",
+    "experience": [],
+    "employment": [],
+    "tags": [],
+    "underTenApplicants": false,
+    "verified": false,
+    "easyApplyOnly": false
+  },
   "positive": ["{{POSITIVE_STACK_REGEX_1}}", "{{POSITIVE_STACK_REGEX_2}}"],
   "reject": [
     { "re": "\\b(junior|jr\\.?|intern|internship|trainee|entry[- ]level|graduate program|working student|becario|practicante)\\b", "why": "junior/entry" },

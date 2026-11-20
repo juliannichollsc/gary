@@ -6,6 +6,9 @@ metadata:
 ---
 
 # Himalayas source (by @jnichollsc)
+
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
 > Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board runbook: `docs/career-ops-map.md` §4.
 
 Engine: `node engines/himalayas-matches.mjs` over the logged-in automation browser (CDP debug Chrome —
@@ -18,7 +21,7 @@ Candidate facts come from `config/profile.yml` + the NotebookLM RAG. Never click
 - **Cloudflare "Just a moment…"** guards every job DETAIL page (the matches LIST loads fine). It **auto-clears ~4s in the
   real logged-in browser**, so the engine **POLLS** the page (re-check title/content every ~2s, up to ~16s) and extracts
   ONLY once the challenge clears. A short fixed wait captures the challenge page — that was the original bug (208 "Just a moment" captures).
-- **429 / rate-limit** → anti-block cadence: **MAX 2 concurrent JD fetches + ~2s gap** between batches. Runs serial-ish on the CDP browser.
+- **429 / rate-limit** → anti-block cadence: **ONE JD page at a time, jittered 4–9 s** between opens (global one-bot / one-tab-per-site rule; the engine locks `himalayas.app`).
 - **The public `/jobs/api` is NOT a workaround** — it returns only the latest ~20 GLOBAL jobs (offset-paginated), ignores
   `limit`/`company`, has ZERO overlap with personalized matches, and per-job `.json` is itself Cloudflare-blocked. CDP + poll-until-clear is the only path to personalized-match JDs.
 - **Closed/expired** → a page that never clears past the challenge or renders no JD is left uncaptured (resumable retry), never scored on the title.
@@ -39,6 +42,6 @@ Candidate facts come from `config/profile.yml` + the NotebookLM RAG. Never click
 
 ## 4. WEBFETCH FILTERING
 - **Primary validation is via logged-in CDP** (poll-until-clear), NOT WebFetch — Cloudflare blocks WebFetch/`.json` for detail pages.
-- **WebFetch is only the fallback** when CDP is unavailable: fetch the JD page directly at the same cadence (≤2 concurrent / ~2s gap).
+- **WebFetch is only the fallback** when CDP is unavailable: fetch the JD page directly at the same cadence (one request at a time, 4–9 s jitter).
 - **Rule: read the real JD, never the slug/title alone.** Fit is decided on each job's captured `description` in
   `himalayas-jobs.json` against the two-way-fit gate (eligibility / comp / YOE / no-AWS-hardreq / company-dedup / posted ≤1 week), then merged into the master doc.

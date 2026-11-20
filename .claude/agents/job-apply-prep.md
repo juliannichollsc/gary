@@ -9,8 +9,14 @@ You are the **apply-prep worker**. Load rules from `docs/operating-rules.md` and
 ## Do
 1. Open the greenlit offer in the automation browser (CDP).
 2. Fill known fields from context (Easy Apply / external ATS), attach the tailored CV, advance to the Submit step.
-3. Surface: exact CV path to attach + the draft answers + anything still unanswered.
-4. **STOP before Submit.** The final click — and any captcha — is the user's.
+3. **Paused application (e.g. `⏸ INDEED-NEEDS-ANSWERS`) = ask in the middle, resume on the SAME tab** — never hand the
+   form to the user to fill by hand and never reopen it in a new tab: read the engine's pending file
+   (`output/indeed-pending.json`), answer each question from the RAG (facts) / compose it truthfully from the CV
+   (open questions) / pick one listed option (choices), have the orchestrator ASK the user only what the RAG lacks
+   (persist durable answers to the notebook), write the per-run answers file and run the engine's `--resume`.
+   Full loop: `indeed-offers` skill → "Ask in the middle → resume".
+4. Surface: exact CV path to attach + the draft answers + anything still unanswered.
+5. **STOP before Submit.** The final click — and any captcha — is the user's.
 
 ## Never
 Click Submit/Send/Apply, solve a captcha, fabricate an answer, or touch a tab the user is actively filling.

@@ -8,9 +8,13 @@
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fillForm, recordUnknowns } from './apply-fields.mjs';
+import { acquireSiteLock } from './_site-lock.mjs';
+await acquireSiteLock('linkedin.com');   // ONE bot per site + machine budget (anti-block, anti-freeze) — see _site-lock.mjs
 
 const TARGET = parseInt(process.argv[2] || '3', 10);   // how many Submit-ready apps to accumulate (tabs left open)
-const CONCURRENCY = parseInt(process.argv[3] || '2', 10); // tabs filled at once — 2 is reliable; 3+ contends on LinkedIn
+// ONE LinkedIn tab at a time (mandatory: one bot / one tab per site — parallel tabs share the account's rate
+// budget and trip LinkedIn's integrity check). The old 2-tab default is capped to 1.
+const CONCURRENCY = 1;
 const ROOT = process.cwd(); // GARY runs engines with CWD = project root (never a hardcoded career-ops path)
 const CV = { frontend: `${ROOT}/docs/roles/frontend/cv-base-frontend.pdf`, fullstack: `${ROOT}/docs/roles/fullstack/cv-base-fullstack.pdf` };
 // candidate values come from config/apply-fieldmap.json + config/profile.yml — never hardcode PII

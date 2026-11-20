@@ -6,10 +6,13 @@ metadata:
 ---
 
 # LinkedIn source (by @jnichollsc)
+
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
 > Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board runbook: `docs/career-ops-map.md` §4.
 > **When a LinkedIn sweep returns `scanned 0` / empty JDs / a `writeSeen` RangeError → read
-> [`references/linkedin-dom-recovery.md`](references/linkedin-dom-recovery.md)** (currentJobId split-view
-> requirement, self-healing selectors + `ENGINE-SELECTOR-STALE` escalation, corrupt-`seen` recovery).
+> [`references/linkedin-dom-recovery.md`](references/linkedin-dom-recovery.md)** (Gmail URLs open through the e-mail's own link —
+> never a crafted currentJobId URL, self-healing selectors + `ENGINE-SELECTOR-STALE` escalation, corrupt-`seen` recovery).
 
 One engine, offer-by-offer: `engines/linkedin-scan.mjs` drives the logged-in automation browser
 (CDP debug Chrome — port/profile are DATA in `config/profile.yml` → `job_search.automation_browser`;
@@ -54,9 +57,59 @@ Titles/locations/workType come from the filter config, not this file. Override p
   candidate is below → do NOT lie, DISCARD.
 - **External ATS** offers (non-EasyApply) = open-and-hand-off; the same script follows the external tab, fills safe fields, stops before Submit.
 
-## 3. PAGINATION
-- Traverse the WHOLE set via `&start=0,25,50…` across pages (overlap is harmless — see dedup). Stop when a page yields no new ids.
-- **≤1-week early-stop** is enforced by `f_TPR` (week/day); apply the recency window from the card/JD date when needed.
+## 3. FILTER MAPPING — HUMAN-LIKE (MANDATORY, owner order 2026-11-10: LinkedIn must not detect the bot or the AI)
+LinkedIn's jobs search is now **conversational** (`/jobs/search-results/`, box "Describe the job you want"): it
+**ignores** the legacy URL filters (`f_WT`, `f_TPR`, `f_AL`, `geoId`, `&start=`) and a hand-built filter URL is a
+bot signature. `engines/linkedin-scan.mjs` therefore maps like a person:
+- **Do what a person does, in THREE steps (owner order 2026-11-10, after "Full Stack Developer Colombia" + an unapplied date):**
+  1. **Type ONLY the role** into LinkedIn's box ("Describe the job you want"), keystroke jitter; the previous query is
+     cleared first and the box value is verified (autocomplete guard). Never the place, never a prompt-like sentence.
+  2. **Region = LinkedIn's own location control** — the "📍 <place> ▾" beside "N results": click it, type the region
+     (`locations[]`; Worldwide for `geo 92000000`), pick the matching suggestion, verify the control now shows it.
+  3. **Date posted → Past week in its own pill** (bar button `[aria-label="Filter by Date posted"]` → the on-screen
+     "Past week" radio → "Show results"), then verify the pill reads/marks the period. NOT via "All filters" (its
+     hidden duplicate inputs made the tick silently fail).
+  Each step that LinkedIn doesn't take prints `⚠ LINKEDIN-REGION` / `⚠ LINKEDIN-DATE-FILTER`; the ≤7-day gate on
+  every card/JD still enforces the window. Log line: `LinkedIn search → role · region · date · N results`.
+  **Offline regression test (run after ANY change here, no account touched):**
+  `GARY_LI_HOME=file://$PWD/engines/fixtures/linkedin-search-results.html node engines/linkedin-scan.mjs --all --pages 2 --max-views 6`
+  from a scratch folder with its own `config/easyapply-filter.json` + `output/` (so it doesn't share the real lock/seen file);
+  expected: role typed alone · region applied · date applied · 24 results · Easy Apply → auto / others → manual ·
+  On-site skipped when remote-only. Update the fixture when LinkedIn's UI changes.
+- **Modality is read from each card's text** ("(Remote)/(Hybrid)/(On-site)") against `workType` — other modalities are
+  not even opened (0 extra requests).
+- **Location = the user's onboarding answer, by SCENARIO (owner order 2026-11-10).** Read `Ubicación` (country + city of
+  residence) and `Modalidad aceptada` from the RAG / `gary-context.md`; if either is missing, ASK before mapping
+  ("¿Dónde vives y qué modalidad aceptas?") and persist the answer to the RAG. Then:
+
+  | Accepted modality | `workType` | `locations` (each = one region typed in LinkedIn's location control) | `city` |
+  |---|---|---|---|
+  | Remote only | `2` | country of residence → its wider region (e.g. Latin America) → Worldwide | — |
+  | On-site only | `1` | the CITY of residence | that city |
+  | Hybrid only | `3` | the CITY | that city |
+  | Mixed (remote + on-site/hybrid) | `1,2,3` (or the accepted subset) | remote regions + the city | that city |
+
+  With `city` set, an On-site/Hybrid card outside that city is skipped without opening it; remote cards are judged
+  by region-lock in triage. A user who moves → update the RAG answer and regenerate `easyapply-filter.json`.
+  Before mapping, show the plan in one line ("Busco remoto en Colombia, Latin America y Worldwide + presencial/híbrido en <city>. ¿Correcto?").
+- **Validity + full map:** every opened offer is checked for "No longer accepting applications" (closed → never a
+  survivor). Every card of the run lands in `output/linkedin-jobs.json` with its outcome (survivor auto/manual ·
+  rejected: <why> · closed · skipped: modality / outside city / older than 7 d · seen before) — the temp map the LM
+  triages from (region-lock + profile); survivors with JD excerpts stay in the `--out` survivors file.
+- **EVERY offer is mapped; Easy Apply is only a FLAG** (card or detail pane): survivors carry `easy` + `apply: "auto"`
+  (Easy Apply → `easyapply-batch` / `apply-from-linkedin` auto-fill) or `apply: "manual"` (no Easy Apply → merged into the
+  offers map for the USER to apply by hand). Never drop an offer for lacking Easy Apply (`easyApplyOnly: true` is an
+  explicit opt-in only).
+- **Titles come from the CV, zone + modality are ASKED at search time** (stored RAG answers shown for one-line
+  confirmation) and written to `config/easyapply-filter.json` (`titles`/`locations`/`workType`); without them the engine
+  refuses to search (`⛔ LINKEDIN-FILTERS`, exit 2).
+- Experience level / employment type / AI-suggested tags (`linkedinFilters`) are **OFF by default** — only if the user
+  explicitly asks; every extra click is more activity for LinkedIn to analyse.
+- **Paginate with the "Page N" buttons** (hover → click, 8–15 s), hover the list and wheel-scroll it; title/location
+  order is **shuffled every run** so the query sequence never repeats. Stop when a page yields no new ids.
+- The engine prints the effective tags (`LinkedIn filter tags → date · … · N results`) and per page how many cards were skipped as `not Easy Apply` / `other modality`. If the
+  conversational box is missing (classic layout / A-B test) it falls back to the legacy URL filters.
+- **≤1-week window** = the Past week tag; apply the recency window from the card/JD date when needed.
 - **Zero-token keyword PRE-FILTER per card** (in the engine): auto-discards clear misses (junior/intern, off-stack languages,
   US-only/work-auth, 10+ yrs) using `config/easyapply-filter.json` `positive`/`reject`. Conservative — anything ambiguous SURVIVES to the LLM.
 - **Global persistent dedup:** `output/gmail-harvest/linkedin-seen.json` (jobId → record, written incrementally, resumable). Each offer processed once, ever — across pages, combos, and runs.

@@ -3,7 +3,6 @@
 // LLM API (see onboarding.ts). Continue is disabled until each step is valid; the stepper is keyboard-operable.
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Button, Chip, StatusDot } from "../components/ui";
-import { TutorialButton } from "../components/TutorialButton";
 import { Check, File, Upload, X, Plus, Loader } from "../icons";
 import { useT, useLang, setLang, LANGS, type Lang } from "../i18n";
 import { notebooklmStatus, connectNotebooklm } from "../settings";
@@ -31,8 +30,8 @@ function fmtSize(bytes: number): string {
 }
 
 export function OnboardingView(
-  { onDone, resume, forceStep, tutorial }:
-  { onDone?: () => void; resume?: boolean; forceStep?: number; tutorial?: boolean },
+  { onDone, resume, forceStep, tutorial, returning }:
+  { onDone?: () => void; resume?: boolean; forceStep?: number; tutorial?: boolean; returning?: boolean },
 ) {
   const t = useT();
   const lang = useLang();
@@ -240,7 +239,7 @@ export function OnboardingView(
   return (
     <div className="view">
       <header className="viewhead">
-        <h1 className="viewhead__title">{t("nav.onboarding")}</h1>
+        <h1 className="viewhead__title">{returning ? t("nav.onboarding") : t("ob.setup.title")}</h1>
         {/* Selector de idioma (por defecto el actual) — visible en TODO el onboarding para elegir al llegar.
             La misma opción vive en Ajustes. */}
         <label className="viewhead__lang">
@@ -249,15 +248,23 @@ export function OnboardingView(
             {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </label>
-        <TutorialButton />
       </header>
 
       <div className="onboard">
-        <div className="onboard__hero">
-          <Avatar kind="brand" size={64} />
-          <h2 className="onboard__title">{t("ob.welcome")}</h2>
-          <p className="onboard__subtitle">{t("ob.welcomeSub")}</p>
-        </div>
+        {/* Primera vez: bienvenida con la marca. Usuario que vuelve (ya configurado): encabezado de perfil
+            sobrio — no se le vuelve a "dar la bienvenida" cada vez que revisa su contexto. */}
+        {returning ? (
+          <div className="onboard__hero onboard__hero--compact">
+            <h2 className="onboard__title">{t("ob.returning.title")}</h2>
+            <p className="onboard__subtitle">{t("ob.returning.sub")}</p>
+          </div>
+        ) : (
+          <div className="onboard__hero">
+            <Avatar kind="brand" size={64} />
+            <h2 className="onboard__title">{t("ob.welcome")}</h2>
+            <p className="onboard__subtitle">{t("ob.welcomeSub")}</p>
+          </div>
+        )}
 
         <Stepper step={activeStep} onJump={(n) => { if (n < step) setStep(n); }} />
 
@@ -277,7 +284,10 @@ export function OnboardingView(
         )}
 
         <div className="onboard__nav">
-          <Button variant="ghost" onClick={goBack} disabled={activeStep === 1}>{t("ob.back")}</Button>
+          {/* En el paso 1 no hay "atrás": se oculta (conserva el hueco para que Continuar no salte). */}
+          <Button variant="ghost" onClick={goBack} disabled={activeStep === 1}
+                  className={activeStep === 1 ? "is-placeholder" : ""} aria-hidden={activeStep === 1}
+                  tabIndex={activeStep === 1 ? -1 : undefined}>{t("ob.back")}</Button>
           <Button variant="primary" onClick={goNext} disabled={!canContinue}>
             {activeStep === LAST ? t("ob.finish") : t("ob.continue")}
           </Button>

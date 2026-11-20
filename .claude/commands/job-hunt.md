@@ -9,6 +9,8 @@ You are the **orchestrator** for the candidate's high-volume job search. You do 
 
 **Concurrency cap: 3 agents at a time.** Spawn parallel agents in a single message with multiple Agent tool calls; if a stage has >3 items, batch them.
 
+**MACHINE BUDGET (MANDATORY, CLAUDE.md):** before launching ANY engine run `node engines/_machine-guard.mjs` and never run more bots than `maxBots − running` (the Rendimiento level, capped by hardware + free RAM); every browser script — including your own one-off probes — must `await acquireSiteLock()` from `engines/_site-lock.mjs`. On any `⚠ GARY-MACHINE` / `⛔ GARY-MACHINE-OVERLOAD` line: tell the user at once and reduce on your own (no new engines, serialize, lower `--max-views`/`--max`, raise `--pace`) until it reports `ok`. Agents (triage/evaluate) are API-side and don't count, but the engines they trigger do.
+
 Optional `$ARGUMENTS`: a path to a URL list, "harvest" to pull the mailbox first, or "scan" to run only the daily feed. Default = harvest + scan + full pipeline.
 
 ## Automation browser (never touch the user's personal browser)

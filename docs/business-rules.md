@@ -60,9 +60,7 @@ running the user's terminal LM CLI, which loads `.claude/skills` + `.claude/agen
 - **System-first optimization (MANDATORY).** Protecting the user's machine outranks convenience. Prefer
   **manual, one-shot, browser-reusing** actions over background polling loops or spawning a second browser —
   reuse the ONE automation Chrome (`:9333`, already logged in) and verify **once** (the Conexiones /
-  NotebookLM-connect pattern), never poll on a timer or run an infinite listen. `settings.performance` caps
-  simultaneous windows/automations/bots to the machine's capacity — this is SEPARATE from the per-site 429
-  rules (§4). When a step CAN be manual and that greatly cuts local impact (CPU/RAM/crash risk), choose
+  NotebookLM-connect pattern), never poll on a timer or run an infinite listen. `settings.performance` caps simultaneous bots to the machine's capacity and is ENFORCED by `engines/_machine-guard.mjs` (via `_site-lock.mjs`: budget = min(level, hardware, free RAM now), RAM/CPU/PSI monitor, auto back-off/stop, LM must warn the user and reduce — CLAUDE.md MANDATORY) — this is SEPARATE from the per-site 429 rules (§4). When a step CAN be manual and that greatly cuts local impact (CPU/RAM/crash risk), choose
   manual and **surface it to the user** for approval/adaptation — same human-in-the-loop ethos as Submit.
 
 ## 3. The two-way-fit gate (triage — an offer must pass ALL; thresholds are DATA in profile.yml)

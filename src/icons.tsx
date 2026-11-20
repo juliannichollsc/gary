@@ -69,6 +69,43 @@ export const BarChart = (p: SVGProps<SVGSVGElement>) => (
   <svg {...S(p)}><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
 );
 
+export const User = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
+);
+export const TerminalIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></svg>
+);
+export const Globe = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" /></svg>
+);
+export const Cpu = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" /></svg>
+);
+export const RotateCcw = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+);
+export const AlertTriangle = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></svg>
+);
+export const Info = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+);
+export const CheckCircle = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><circle cx="12" cy="12" r="10" /><path d="m8 12 3 3 5-6" /></svg>
+);
+export const PanelLeft = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
+);
+export const RowsComfortable = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><rect x="3" y="4" width="18" height="7" rx="1.5" /><rect x="3" y="13" width="18" height="7" rx="1.5" /></svg>
+);
+export const RowsCompact = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><path d="M3 5h18M3 9.67h18M3 14.33h18M3 19h18" /></svg>
+);
+export const ExternalLink = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...S(p)}><path d="M15 3h6v6M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+);
+
 // The Paw — brand mark (crafted SVG, not the emoji). Sized by `size`, colored by currentColor.
 export const Paw = ({ size = 24, ...p }: { size?: number } & SVGProps<SVGSVGElement>) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden {...p}>
