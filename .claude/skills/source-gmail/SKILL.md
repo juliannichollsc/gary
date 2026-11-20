@@ -6,6 +6,9 @@ metadata:
 ---
 
 # Gmail source (by @jnichollsc)
+
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
 > Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board runbook: `docs/career-ops-map.md` §4.
 
 Mine the user's job-alert inbox over the logged-in automation browser (CDP). The alert account is DATA
@@ -41,14 +44,17 @@ extract + dedup offer URLs → chunk → triage by real JD. Never applies. Candi
   writes the SAME `output/gmail-harvest/survivors.json` (JD ≤1500 captured). **The LLM triages FROM that file — no
   per-offer WebFetch → big token reduction.** Serial, one reused tab, gentle pacing (logged-in CDP → no 429; stay serial
   to avoid detection).
-- **JD renders ONLY in the search split-view.** For a standalone offer the engine navigates the logged-in tab to
-  `https://www.linkedin.com/jobs/search/?currentJobId={id}` — the `#job-details` pane populates there. Direct
-  `/jobs/view/{id}` nav renders nav chrome with NO JD (LinkedIn behaviour), which silently marked every offer
-  unreadable. The pane hydrates a beat AFTER the selector attaches, so the engine waits for the selector (≤14s) **and
-  then** a settle delay before scraping.
+- **Open each offer the way a person does — through the e-mail's OWN link (owner order 2026-11-13).** A person
+  reading an alert clicks its link (`/comm/jobs/view/{id}/?trackingId=…`) and lands on the offer. So the engine opens
+  that same e-mail link (fallback: the canonical `/jobs/view/{id}/`), with Gmail as the referrer, READS the page
+  (jittered wheel scrolls + "…more" on the JD) and only then scrapes. **NEVER** build
+  `/jobs/search/?currentJobId={id}` for each offer: that crafted URL lands on LinkedIn's AI-powered search ("You're
+  now using AI-powered job search" toast) dozens of times in a row — a bot signature. It survives only as the opt-in
+  `--split-view` escape hatch. The page hydrates a beat AFTER the selector attaches, so the engine waits for the
+  selector (≤14s) **and then** a settle delay before reading.
 - **GENERIC, self-healing JD selector.** `scrapeDetail()` picks stable-id-first (`#job-details`) then GENERIC
   `[class*="jobs-description"]` fallbacks, so a LinkedIn class rename keeps matching. If the JD pane stops rendering
-  entirely, the engine's consecutive-empty guard (`--fail-limit`, default 8) ABORTS after N empty JDs in a row and
+  entirely, the engine's consecutive-empty guard (`--fail-limit`, default 3 — ≤3 wasted views of the user's account) ABORTS after N empty JDs in a row and
   prints `ENGINE-SELECTOR-STALE` → **that is the signal for the LM supervisor to refresh the selectors** in
   `engines/linkedin-scan.mjs` against the current DOM, rather than burning the whole batch. (This is the supervisor's
   case #1 — an unexpected engine error to recover/adapt.) Full failure-mode reference:

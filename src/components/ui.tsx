@@ -1,7 +1,7 @@
 // GARY 🐾 — base primitives (components.md §A). Themed, keyboard-accessible, token-driven.
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useState } from "react";
-import { Loader, Check, Eye, EyeOff } from "../icons";
+import { Loader, Check, Eye, EyeOff, User } from "../icons";
 
 // The official brand mark (husky isotipo, watermark-cleaned, transparent bg). Served from public/.
 export const ISOTIPO_SRC = "/isotipo-clean.png";
@@ -138,8 +138,8 @@ export function ScoreMeter({ score }: { score: number }) {
   );
 }
 
-// StatusBox (components.md §F, design-system §1.5) — tri-state, never color-only: dot + mono glyph
-// (mirrors the offers-master.md boxes) + text label.
+// StatusBox (components.md §F, design-system §1.5) — tri-state, never color-only: colored mono glyph
+// (mirrors the offers-master.md boxes) + text label. No extra dot: glyph + label already carry it.
 export type OfferStatus = "pendiente" | "aplicada" | "flag";
 const STATUS_META: Record<OfferStatus, { glyph: string; label: string; tone: Status | "muted" }> = {
   pendiente: { glyph: "[ ]", label: "Pendiente", tone: "muted" },
@@ -150,15 +150,14 @@ export function StatusBox({ status }: { status: OfferStatus }) {
   const m = STATUS_META[status];
   return (
     <span className={`statusbox statusbox--${m.tone}`}>
-      {m.tone !== "muted" && <StatusDot status={m.tone} />}
-      {m.tone === "muted" && <span className="statusbox__nodot" aria-hidden />}
       <span className="statusbox__glyph" aria-hidden>{m.glyph}</span>
       <span className="statusbox__label">{m.label}</span>
     </span>
   );
 }
 
-// Avatar — the brand mark (`paw`/`brand` → official isotipo image) or the user monogram.
+// Avatar — the brand mark (`paw`/`brand` → official isotipo image) or a neutral user glyph. Never initials:
+// the UI is candidate-agnostic and has no business knowing (or hardcoding) the user's name.
 export function Avatar({ kind = "brand", size = 40 }: { kind?: "paw" | "brand" | "user"; size?: number }) {
   if (kind !== "user") {
     return (
@@ -167,5 +166,9 @@ export function Avatar({ kind = "brand", size = 40 }: { kind?: "paw" | "brand" |
       </span>
     );
   }
-  return <span className="avatar avatar--user" style={{ width: size, height: size }}>JN</span>;
+  return (
+    <span className="avatar avatar--user" style={{ width: size, height: size }} aria-hidden>
+      <User width={Math.round(size * 0.55)} height={Math.round(size * 0.55)} />
+    </span>
+  );
 }

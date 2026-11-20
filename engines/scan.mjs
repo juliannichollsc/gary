@@ -36,6 +36,8 @@ import path from 'path';
 import yaml from 'js-yaml';
 
 import { makeHttpCtx } from './providers/_http.mjs';
+import { registryTargets, recordBoard, saveRegistryState } from './ats-registry.mjs';
+import { acquireSiteLock } from './_site-lock.mjs';
 
 const parseYaml = yaml.load;
 
@@ -599,6 +601,8 @@ function guardStatusFor(code) {
 
 async function main() {
   const args = process.argv.slice(2);
+  // Counts as one bot in the machine budget (one ATS scan at a time; HTTP-only but long and network-heavy).
+  if (!args.includes('--dry-run')) await acquireSiteLock('ats-scan');
   const dryRun = args.includes('--dry-run');
   const verify = args.includes('--verify');
   // Opt-in: on an anti-bot challenge (e.g. pracuj.pl Cloudflare wall), retry the
@@ -691,6 +695,11 @@ async function main() {
 
   resolveEntries(companies);
   resolveEntries(boards, { isBoard: true });
+  // Large ATS registry (~15k Greenhouse/Lever/Ashby boards), one rotating slice per run — see ats-registry.mjs.
+  if (config.ats_registry?.enabled && !filterCompany) {
+    const tracked = new Set(companies.map((c) => c && c.careers_url).filter(Boolean));
+    resolveEntries(await registryTargets(config.ats_registry, tracked));
+  }
 
   const localParserCount = targets.filter(t => t._provider.id === 'local-parser').length;
   const companyCount = targets.length - boardCount;
@@ -713,9 +722,17 @@ async function main() {
   let totalFilteredTitle = 0;
   let totalFilteredLocation = 0;
   let totalFilteredSalary = 0;
+  // ≤N-day recency gate (owner order 2026-11-10: max 1 week). Providers expose postedAt (epoch ms: Greenhouse
+  // first_published, Lever createdAt, Ashby publishedAt, Workday postedOn, …); older → dropped. No date → kept.
+  // Override: portals.yml → max_age_days, or --max-age N.
+  const ageArgI = args.indexOf('--max-age');
+  const maxAgeDays = ageArgI >= 0 ? parseInt(args[ageArgI + 1], 10) : (Number.isFinite(config.max_age_days) ? config.max_age_days : 7);
+  const ageCutoff = Date.now() - maxAgeDays * 86400000;
+  let totalFilteredAge = 0;
   let totalDupes = 0;
   const newOffers = [];
   const errors = [...resolveErrors];
+  let registryErrors = 0; // dead/renamed registry slugs are expected — counted, not listed one by one
 
   const tasks = targets.map(company => async () => {
     let provider = company._provider;
@@ -740,6 +757,7 @@ async function main() {
       if (!Array.isArray(jobs)) {
         throw new Error(`${provider.id}: fetch() did not return an array`);
       }
+      if (company._registryKey) recordBoard(company._registryKey, jobs);
       totalFound += jobs.length;
 
       for (const job of jobs) {
@@ -753,6 +771,10 @@ async function main() {
         }
         if (!salaryFilter(job.salary)) {
           totalFilteredSalary++;
+          continue;
+        }
+        if (Number.isFinite(job.postedAt) && job.postedAt < ageCutoff) {
+          totalFilteredAge++;
           continue;
         }
         if (seenUrls.has(job.url)) {
@@ -779,11 +801,13 @@ async function main() {
         });
       }
     } catch (err) {
-      errors.push({ company: company.name, error: err.message });
+      if (company._registryKey) { recordBoard(company._registryKey, null, err); registryErrors++; }
+      else errors.push({ company: company.name, error: err.message });
     }
   });
 
   await parallelFetch(tasks, CONCURRENCY);
+  saveRegistryState();
 
   // 5.5. Optional liveness verification — drop expired and guard-rejected postings
   let verifiedOffers = newOffers;
@@ -852,6 +876,7 @@ async function main() {
   console.log(`Filtered by title:     ${totalFilteredTitle} removed`);
   console.log(`Filtered by location:  ${totalFilteredLocation} removed`);
   console.log(`Filtered by salary:   ${totalFilteredSalary} removed`);
+  console.log(`Filtered by age:      ${totalFilteredAge} removed (posted > ${maxAgeDays} days ago)`);
   console.log(`Duplicates:            ${totalDupes} skipped`);
   if (historyPolicy.recheckAfterDays != null) {
     console.log(`Recheck eligible:      ${seenUrlState.recheckEligible} old scan-history URL(s)`);
@@ -875,6 +900,7 @@ async function main() {
     }
   }
 
+  if (registryErrors > 0) console.log(`\nATS registry: ${registryErrors} board(s) unreachable (dead/renamed slugs) — rested 60 days after 2 fails.`);
   if (errors.length > 0) {
     console.log(`\nErrors (${errors.length}):`);
     for (const e of errors) {

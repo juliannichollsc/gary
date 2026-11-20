@@ -22,7 +22,7 @@
 | File | What it is |
 |---|---|
 | `docs/operating-rules.md` | The full operating methodology: two-way-fit gate, sourcing, browser/CDP rules, fill-to-Submit, ask-on-untracked, cross-session memory. |
-| `docs/career-ops-map.md` | The **per-board runbook**: exact steps/URLs/APIs, apply mechanisms, the Himalayas ≤2-bot/429 rule, the career-ops→GARY translation table. |
+| `docs/career-ops-map.md` | The **per-board runbook**: exact steps/URLs/APIs, apply mechanisms, the Himalayas one-bot/429 rule, the career-ops→GARY translation table. |
 | `data/linkedin-playbook.md` | Canonical LinkedIn EasyApply methodology (the one engine, offer-by-offer, dedup, scoring). |
 | `data/easyapply-questions.md` | Recurring screening-field preflight (AUTO vs ASK_USER classes). |
 | `.claude/skills/` | Per-board skills + the apply engine skills (see the per-website index below). |
@@ -55,9 +55,12 @@
 | LinkedIn EasyApply | `source-linkedin` · `chrome-autoapply` · `easyapply-autofill` | `linkedin-scan.mjs` → `apply-from-linkedin.mjs` | logged-in CDP | Easy Apply / external ATS → **auto-fill to Submit** | CDP **serial** |
 | LinkedIn via Gmail | `source-gmail` | `gmail-harvest.mjs` | logged-in CDP + WebFetch | routes to LinkedIn/ATS | WebFetch **parallel** |
 | GetOnBoard | `source-getonbrd` · `getonbrd-offers` | `getonbrd-matches.mjs` | public API + logged-in CDP | one-click "Postular" (user's click) | API parallel / apply serial |
-| Himalayas | `source-himalayas` | `himalayas-matches.mjs` | logged-in CDP + WebFetch | external ATS → auto-fill to Submit | **≤2 WebFetch**, Cloudflare poll |
-| Computrabajo | `computrabajo-offers` | — (WebFetch) | anonymous WebFetch | internal one-click "Aplicar" (user's click) | WebFetch parallel / apply serial |
-| Indeed | `indeed-offers` | — (WebFetch) | anonymous WebFetch (page-1) | open-and-hand-off / re-route | WebFetch parallel |
+| Himalayas | `source-himalayas` | `himalayas-matches.mjs` | logged-in CDP + WebFetch | external ATS → auto-fill to Submit | **1 page at a time**, 4–9 s, Cloudflare poll |
+| Computrabajo | `computrabajo-offers` | `computrabajo-apply.mjs` (CDP) | anonymous WebFetch | FULLY automatic on computrabajo.com (user's prefs asked → RAG); external = out of scope | WebFetch parallel / apply serial |
+| Dice · Hireline · Glassdoor | `source-boards` | `board-sweep.mjs` (+ `dice-apply.mjs`) | logged-in CDP (user signs in via Conexiones) | **Dice: FULLY automatic in-platform apply** (`dice-apply.mjs`, owner decision 2026-11-10; external → skip); Glassdoor = map only (user applies); Hireline "Enviar mi CV" = user's click | CDP **serial**, 8–15 s/page, block → no retry same day |
+| Dover | `source-boards` | `dover-jobs.mjs` (own engine) | logged-in CDP tab + same-origin JSON API (remote + past week, by date — no keywords) | map only → user applies on the company's Dover form | serial, 8–15 s/list call, 4–9 s/JD, block → no retry same day |
+| Web — company career pages | `source-web` | `web-companies.mjs` (0-token helper: link classify + safety + ATS list APIs; no browser) | in-session LM web search, filters from the RAG / `gary-context.md` | DIRECT employer pages only (boards/marketplaces rejected) · map only → the user applies on the company's own page (`apply: manual`) | **in-session only, never a background agent**; 1 fetch at a time |
+| Indeed | `indeed-offers` | `indeed-apply.mjs` (CDP, apply only) | anonymous WebFetch (page-1) | Indeed Apply → auto-fill to review; company-site apply = MANUAL for the user (`indeed-manual.json`) | WebFetch parallel; apply serial on CDP |
 | Tecla / VanHack / XpertDirect | `tecla-offers` · `vanhack-offers` · `xpertdirect-offers` | — | login-gated CDP | one-click profile apply / "Pitch" (user's click), vetting gate | CDP serial |
 | A new board | `website-analyzer` | `inspect-session-site.mjs` | scout | classify, then add a `source-<site>` skill | — |
 

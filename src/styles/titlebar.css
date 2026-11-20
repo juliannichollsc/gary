@@ -34,10 +34,20 @@
   align-items: center;
   gap: var(--space-2);
   height: 100%;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   padding: 0 var(--space-3);
   min-width: 0;
 }
+/* Botón mostrar/ocultar sidebar (izquierda, antes de la marca). No es zona de arrastre. */
+.titlebar__toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 26px; margin-right: var(--space-1); border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.titlebar__toggle:hover { background: var(--surface-3); color: var(--text); }
+.titlebar__toggle--on { color: var(--text-secondary); }
+.titlebar__toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .titlebar__logo {
   width: 20px;
   height: 20px;
@@ -52,6 +62,17 @@
   letter-spacing: 0.04em;
   color: var(--text);
 }
+
+.titlebar__drag { flex: 1 1 auto; height: 100%; }
+.titlebar__help {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; margin-right: var(--space-2);
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted);
+  font: inherit; font-size: 12px; cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.titlebar__help:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+.titlebar__help:disabled { opacity: 0.5; cursor: default; }
+.titlebar__help:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
 /* Right: window controls. Not draggable so clicks reach the buttons. */
 .titlebar__controls {
@@ -76,3 +97,8 @@
 .titlebar__btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .titlebar__btn--close:hover { background: var(--danger); color: var(--accent-on); }
 .titlebar__btn svg { display: block; }
+
+/* Microinteracción de marca: el isotipo hace un leve "meneo" (2°) al pasar el mouse por la marca. */
+.titlebar__brand:hover .titlebar__logo { animation: wag 300ms ease-in-out 1; }
+@keyframes wag { 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) { .titlebar__brand:hover .titlebar__logo { animation: none; } }

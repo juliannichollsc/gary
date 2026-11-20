@@ -6,7 +6,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button, StatusDot, Input } from "../components/ui";
 import { File } from "../icons";
 import type { ViewId } from "../components/Sidebar";
-import { TutorialButton } from "../components/TutorialButton";
 import { loadOnboarding, type CvFile } from "../onboarding";
 import {
   DEFAULTS, BROWSERS, type BrowserId, type Settings,
@@ -15,6 +14,7 @@ import {
   browserStatus, startBrowser, stopBrowser, type BrowserStatus,
   openInBrowser,
 } from "../settings";
+import { useToast } from "../toast";
 import { useT, useLang, setLang, LANGS, type Lang } from "../i18n";
 
 function fmtSize(bytes: number): string {
@@ -29,6 +29,7 @@ const openLocalPath = (path: string) => { invoke("open_path", { path }).catch(()
 
 export function SettingsView({ onNavigate }: { onNavigate?: (v: ViewId) => void }) {
   const t = useT();
+  const toast = useToast();
   const lang = useLang();
   const recommended = recommendPerf();
   const [cv, setCv] = useState<CvFile | null>(null);
@@ -61,8 +62,16 @@ export function SettingsView({ onNavigate }: { onNavigate?: (v: ViewId) => void 
   const onStartBrowser = async () => {
     const s = await startBrowser(settings.browser, settings.browserPort);
     if (s) setBrowser(s);
+    toast.show(s?.running
+      ? { type: "success", message: t("toast.browser.started") }
+      : { type: "danger", message: t("toast.browser.failed") });
   };
-  const onStopBrowser = async () => { const s = await stopBrowser(); if (s) setBrowser(s); };
+  const onStopBrowser = async () => {
+    const s = await stopBrowser();
+    if (s) setBrowser(s);
+    if (s && !s.running) toast.show({ type: "info", message: t("toast.browser.stopped") });
+    else toast.show({ type: "danger", message: t("toast.browser.stopFailed") });
+  };
 
   // Abrir NotebookLM en el MISMO navegador de automatización (:9333) donde vive la sesión de Google —
   // NO en el navegador por defecto del SO (antes abría Brave). Si no corre, lo arranca y luego abre la URL.
@@ -74,7 +83,7 @@ export function SettingsView({ onNavigate }: { onNavigate?: (v: ViewId) => void 
 
   return (
     <div className="view">
-      <header className="viewhead"><h1 className="viewhead__title">{t("settings.title")}</h1><TutorialButton /></header>
+      <header className="viewhead"><h1 className="viewhead__title">{t("settings.title")}</h1></header>
 
       <div className="settings">
         <p className="settings__intro">{t("settings.intro")}</p>
@@ -138,8 +147,10 @@ export function SettingsView({ onNavigate }: { onNavigate?: (v: ViewId) => void 
                 <StatusDot status={browser.running ? "success" : "info"} />
                 {browser.running ? `${t("settings.browser.running")} :${browser.port}` : t("settings.browser.stopped")}
               </span>
-              <Button variant="primary" onClick={onStartBrowser} disabled={browser.running}>{t("settings.browser.start")}</Button>
-              <Button variant="danger" onClick={onStopBrowser} disabled={!browser.running}>{t("settings.browser.stop")}</Button>
+              {/* Un solo botón según el estado (no dos, uno siempre deshabilitado). */}
+              {browser.running
+                ? <Button variant="danger" onClick={onStopBrowser}>{t("settings.browser.toggle.stop")}</Button>
+                : <Button variant="primary" onClick={onStartBrowser}>{t("settings.browser.toggle.start")}</Button>}
               <label className="field field--inline">
                 <span className="field__label">{t("settings.browser.port")}</span>
                 <Input type="number" className="input--port" aria-label="Puerto de depuración (CDP)"

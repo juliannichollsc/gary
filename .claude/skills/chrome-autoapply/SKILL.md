@@ -7,6 +7,9 @@ metadata:
 
 # chrome-autoapply — agent-browser engine for the user's job applications
 
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
+
 > **GARY banner.** Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board
 > runbook: `docs/career-ops-map.md §4`. All person-specific facts are DATA — comp floor / city /
 > country / language / accounts live in `config/profile.yml`; skills, YOE and gaps come from the
@@ -93,7 +96,7 @@ tokens; the LLM only reasons over the few survivors. Do NOT hand-drive snapshot-
 node engines/linkedin-scan.mjs --all --tpr r604800          # FULL SWEEP: every title × location, one tab
 node engines/linkedin-scan.mjs --kw "{TITLE}" --loc "{LOCATION}" --tpr r604800   # single combo (Worldwide: --geo 92000000)
 ```
-URL filters: Easy Apply `f_AL=true`, `f_TPR=r604800` (week) / `r86400` (24h), `sortBy=DD`, and **work-type
+**Filters are applied the HUMAN way (2026-11 conversational LinkedIn — see `source-linkedin` §3): typed title + zone, only the Past week tag, modality read from each card, every offer mapped with an Easy Apply flag (auto vs manual); never a crafted filter URL.** The legacy URL filters below are only the fallback for the classic layout: Easy Apply `f_AL=true`, `f_TPR=r604800` (week) / `r86400` (24h), `sortBy=DD`, and **work-type
 `f_WT` — DATA, NOT a constant: it comes from the MODALITY the candidate answered in the onboarding preguntas
 típicas** (`easyapply-filter.json` `workType`, default `2`=remote): `1`=on-site/presencial · `2`=remote ·
 `3`=hybrid (comma list ok). **Titles/locations/workType are ALL DATA** — target titles from the candidate's role
@@ -170,8 +173,8 @@ application|Upload resume)"'`. (`@eN [button …` patterns match NOTHING.)
 
 ## Other nodes (open-and-hand-off; the apply click is the user's)
 GetOnBoard `Postular`, XpertDirect `Pitch`, Tecla/VanHack (vetting gates) = one-click profile apply →
-agent-browser OPENS the offer for the user; it does not click the apply. Indeed/Computrabajo =
-anti-bot, open-and-hand-off. See `docs/career-ops-map.md §4` for each board's exact runbook.
+agent-browser OPENS the offer for the user; it does not click the apply. Computrabajo =
+`engines/computrabajo-apply.mjs` (fully automatic, owner-authorized; external offers out of scope). Indeed Apply = `engines/indeed-apply.mjs` (fills to review, never sends). See `docs/career-ops-map.md §4` for each board's exact runbook.
 
 ## Output of a run
 Submit-ready queue: per offer → company, role, url, tailored CV path, any flagged field. Hand to the

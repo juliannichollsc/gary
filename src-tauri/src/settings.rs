@@ -51,7 +51,18 @@ pub fn get_settings(app: tauri::AppHandle) -> Result<Settings, String> {
 pub fn set_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), String> {
     let path = settings_path(&app)?;
     let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    std::fs::write(&path, json).map_err(|e| e.to_string())
+    std::fs::write(&path, json).map_err(|e| e.to_string())?;
+    export_runtime(&settings);
+    Ok(())
+}
+
+// Mirror the machine-facing prefs into the workspace so the engines (engines/_machine-guard.mjs) obey the
+// Rendimiento level: output/gary-settings.json = { performance, browserPort }. Best-effort.
+pub fn export_runtime(s: &Settings) {
+    let dir = project_root().join("output");
+    let _ = std::fs::create_dir_all(&dir);
+    let json = serde_json::json!({ "performance": s.performance, "browserPort": s.browser_port });
+    let _ = std::fs::write(dir.join("gary-settings.json"), json.to_string());
 }
 
 // --- API key in the OS keychain (service "gary", account "api-key-<cli>") ---

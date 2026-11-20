@@ -14,7 +14,7 @@ Vercel/stack-specific ones were NOT kept (see "Removed" below):
 - **notebooklm-ai-plugin** — NotebookLM as RAG (source-grounded answers over the user's docs). Powers GARY's candidate context.
 
 ## Authored for GARY (by Julián Nicholls / @jnichollsc)
-- **gary-job-search** (core engine) · **source-linkedin** · **source-gmail** · **source-getonbrd** · **source-himalayas** · **website-analyzer**
+- **gary-job-search** (core engine) · **source-linkedin** · **source-gmail** · **source-getonbrd** · **source-himalayas** · **source-boards** (Dice/Hireline/Glassdoor/Dover) · **source-web** (company career pages via the user's own LM web search, in-session, no bots) · **website-analyzer** · **connections** (connection cards + MANDATORY change protocol + incident log — read before changing any engine/verifier)
   (thin skills → load the methodology from `docs/operating-rules.md`; candidate facts from the NotebookLM RAG.)
 
 ## Installed — Rust/Tauri stack (GARY is a Tauri v2 + Rust app) — vetted 2026-06-30

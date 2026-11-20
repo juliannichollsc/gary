@@ -15,11 +15,12 @@ The user's context is a **NotebookLM notebook** built from their **CV + the ques
 
 ## Flow (see operating-rules.md for detail)
 0. **ATS provider scan (0 tokens, ISOLATED)** — "buscar ofertas" ALSO triggers `node engines/scan.mjs` → `data/pipeline.md`: the mature 16-provider zero-token scanner (Ashby/Greenhouse/Lever/Workday/…), reading `portals.yml` (derived agnostically from an **ATS-only per-session NotebookLM clone**, decoupled from the connections' `gary-context.md`). Runs ALONGSIDE the connections below — never replaces or touches them. Its jobs are recorded under the `ATS` column in `data/metrics.md`. Full rule: `operating-rules.md §4`.
-1. **Source** per board (LinkedIn/Gmail/GetOnBoard/Himalayas/…) — paginate fully, read each JD, validate by description (not title).
-2. **Triage** with the two-way-fit gate (modality/language/profile/YOE/one-per-company/closed).
-3. **Evaluate** A–G + tailor the CV to the mapped role variant.
-4. **Apply-prep** — fill to the Submit step; **the final click + captcha stay the user's**.
-5. **Merge** survivors into `data/offers-master.md` (the one canonical map).
+1. **Filters first (MANDATORY, every search request):** keep the run's search filters MINIMAL — titles FROM THE CV (RAG / `gary-context.md`), ASK the user zone(s) + modality (+ only what a channel needs: salary floor, work authorization); date = past week — confirm stored RAG answers in one line, persist new ones to the RAG, write `config/easyapply-filter.json` + engine flags. Never a silent default.
+2. **Source** per board (LinkedIn/Gmail/GetOnBoard/Himalayas/…) — paginate fully, read each JD, validate by description (not title).
+3. **Triage** with the two-way-fit gate (modality/language/profile/YOE/one-per-company/closed).
+4. **Evaluate** A–G + tailor the CV to the mapped role variant.
+5. **Apply-prep** — fill to the Submit step; **the final click + captcha stay the user's**.
+6. **Merge** survivors into `data/offers-master.md` (the one canonical map).
 
 ## Onboarding (CV → roles → per-offer CV)
 User delivers a base CV → build the NotebookLM context + map role families (variants) → derive the scanner filter → tailor per offer from the role variant. Log into each mapped site in the automation browser once.

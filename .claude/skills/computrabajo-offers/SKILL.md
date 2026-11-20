@@ -1,11 +1,14 @@
 ---
 name: computrabajo-offers
-description: Computrabajo Colombia (co.computrabajo.com) as a source node in GARY's application network — source/filter offers anonymously via WebFetch (no CDP), triage them hard with the two-way-fit gate (most postings are local on-site and below the comp floor), and hand the rare survivors to the orchestrator to OPEN for the user's logged-in one-click Aplicar. Use when sourcing or applying to Computrabajo offers.
+description: Computrabajo Colombia (co.computrabajo.com) as a source node in GARY's application network — source/filter offers anonymously via WebFetch (no CDP), then APPLY FULLY AUTOMATICALLY with engines/computrabajo-apply.mjs (gate on the user's role map + minimum salary + modality, answer the employer questionnaire, send) — only offers applied to ON computrabajo.com. The user's preferences must be ASKED, never assumed. Use when sourcing or applying to Computrabajo offers.
 metadata:
   author: Julián Nicholls (@jnichollsc)
 ---
 
 # Computrabajo Colombia — source node
+
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
 
 > Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board runbook:
 > `docs/career-ops-map.md` §4.
@@ -60,23 +63,55 @@ Computrabajo encodes the query in the URL PATH, not query params. Confirmed patt
 - **429 / rate-limit.** Space WebFetch calls if a burst starts returning empty/blocked HTML; back off
   and retry rather than hammering.
 
-## AUTOMATION — INTERNAL one-click Aplicar; OPEN-and-hand-off (LOW auto-fill)
-- Computrabajo apply is an **internal one-click profile apply**: the button reads **APLICAR**
-  (sometimes *Postularme* / *Inscribirme*). It submits using the candidate's Computrabajo profile/CV
-  and stays on-platform (tracked under *Mis Aplicaciones*) — it does NOT redirect to an external ATS.
-- It therefore behaves like a GetOnBoard *Postular*: **NO on-site form fields** to auto-fill in the
-  common case → nothing for the filler engine (`config/apply-fieldmap.json`) to do. That single
-  Aplicar click **SUBMITS** → per hard rule 6 it is the **user's click, never the agent's**. The
-  agent OPENS the offer and **STOPS** (fill-to-Submit-and-STOP; here there is nothing even to fill).
-- **Variant — screening questionnaire.** Some postings show a multi-step internal questionnaire
-  (*preguntas de filtro*) before submit; those are eligibility/legal/role-specific screening
-  questions → **ASK_USER** (persist the answer to the NotebookLM RAG so it is never re-asked). The
-  filler never guesses them.
-- **CDP path is serialized.** The apply OPEN is a logged-in CDP action on the one debug Chrome →
-  serialized with the other CDP nodes (linkedin/gmail/getonbrd/himalayas), never concurrent.
-- **Net:** AUTO-FILL = NONE in practice (profile-one-click has no fields; the variant is ASK_USER).
-  This node contributes **OPENS for the user's click**, not auto-filled applications — it does NOT
-  move the auto-apply margin. Run it as a light supplemental sweep, not a primary batch.
+## USER PREFERENCES — ASK EVERY USER, NEVER ASSUME (mandatory)
+Computrabajo's questionnaire asks things like **"¿cuál sería tu aspiración salarial?" / "¿cuánto aceptas?"**
+and **modality**, and the engine gates on them. These are **each user's own preferences**: GARY is used by
+many people, so the agent must **never reuse another user's answers** (not the owner's, not a previous
+session's guess) and the engine has **no defaults** — it refuses to run without them. Before the first
+Computrabajo run, if the user's NotebookLM RAG doesn't have them, **ASK the user** and persist the answers to
+the RAG (never to repo files):
+1. **Roles** to apply to (title regex built from the user's role map in `gary-context.md`) → `--roles`.
+2. **Minimum monthly salary in COP** they accept → `--min-salary` (also the default "aspiración" answer;
+   `--aspiracion` if they want to ask for more than their floor).
+3. **Modality**: `remoto` · `remoto+ciudad` (on-site/hybrid only in their city → also ask the **city**,
+   `--ciudad`) · `cualquiera` → `--modalidad`.
+4. **Offers without a published salary**: apply (answer the aspiración) or skip → `--sin-salario aplicar|saltar`.
+5. Any other recurring questionnaire answer (academic level, YOE per stack…) comes from the CV in the RAG;
+   unknown → the engine records it and does NOT send (see below).
+
+## AUTOMATION — FULLY AUTOMATIC apply on computrabajo.com (owner decision 2026-10-30)
+**Scope: only offers applied to ON computrabajo.com.** If "Aplicar" leads to another website (external
+ATS/company site) the engine skips it (`SKIP_EXTERNAL`) — out of scope, never automated.
+**Exception to "never Submit":** the owner authorized Computrabajo to be sent automatically, because its
+"Aplicar" is itself the send for offers without questions. The gate (role + salary + modality) is what
+protects the user; an unanswered required question still blocks the send.
+
+```
+node engines/computrabajo-apply.mjs --roles "<regex>" --min-salary <COP> --modalidad <m> [--ciudad <c>] \
+  [--sin-salario aplicar|saltar] [--aspiracion <COP>] [--max 10] [--pace 1.5] <search-url…>
+```
+Inputs are **search listing URLs** (e.g. `https://co.computrabajo.com/trabajo-de-react-en-teletrabajo`) —
+the engine walks the cards. **Never apply from the standalone offer page**: its button points to
+`candidato…/match/?oi=`, a route Computrabajo's own JS files as *post-apply* (sends without the gate).
+
+### Flow + selector map (mapped live 2026-10-30)
+| Step | Selector / signal | Engine action |
+|---|---|---|
+| listing card | `<article>` + `a[href*="/ofertas-de-trabajo/"]` ending in the 32-hex offer id | title vs `--roles` (no click if it fails) |
+| detail panel | click card → `[data-offers-grid-detail-container]`: header (company · city · modality) + summary ("A convenir" or `$ X (Mensual)`) before "Descripción de la oferta" | gate: salary ≥ min (COP/month), modality (Presencial · Remoto · Presencial y remoto = hybrid), city |
+| Aplicar | `[data-apply-ac][offer-detail-not-applied]` → `POST candidato…/candidate/apply/?oi=` | JSON `result:"OfferHasKQ"` ⇒ questionnaire; other success ⇒ **APPLIED**; non-computrabajo redirect/tab ⇒ SKIP_EXTERNAL |
+| questionnaire | `[form-apply-kq] [div-kq]`: `<label>` + textarea `KillerQuestions[N].OpenQuestion` or radios `…ClosedQuestion` | salary/modality from flags; rest `answerFor()`; unknown ⇒ NEEDS_ANSWERS + "Volver al detalle" (not sent) |
+| send | `a[data-apply-ac-kq]` "Enviar mi HdV" → `POST candidato…/candidate/kq/apply` | **APPLIED** |
+| already applied | "Volver a aplicar" instead of Aplicar | ALREADY_APPLIED |
+
+Statuses: `APPLIED` · `NEEDS_ANSWERS` (record → resolve from the RAG, `learn()`, re-run) · `SKIP_ROLE` ·
+`SKIP_SALARY` · `SKIP_MODALITY` · `SKIP_EXTERNAL` · `ALREADY_APPLIED` · `CLOSED` · `BLOCK` · `ERROR`.
+
+### MANDATORY PACING (same model as LinkedIn `source-linkedin §1`, JITTERED)
+ONE process, ONE tab, serial · **4–9 s** per offer view · **8–15 s** per results page · **2.5–4.5 s** per
+step + human-ish typing · **30–60 s between applications** · **≤10 applications per run** (`--max`, cap 15) ·
+`--pace N` slows all (N<1 refused). **AUTO-STOP** on HTTP 429 / captcha / login wall → writes
+`output/computrabajo-block.json` → no retry the same day. `output/computrabajo-seen.json` = resumable.
 
 ## PAGINATION — traverse the set, early-stop at 1 week, pre-filter cards
 - Paginate the keyword/location search pages until either the result set is exhausted or the
@@ -121,13 +156,11 @@ most postings fail here, so filter aggressively before spending any apply effort
 1. This node WebFetch-sources software-keyword/remote URLs, reads per-card age + modality + salary,
    triages hard, and writes survivors to **`output/gmail-harvest/computrabajo-queue.md`**
    (table: Company | Title | City | Modality | Comp COP | Age | Apply URL | fit note).
-2. The orchestrator (`/job-network`) hands the queue to **`job-apply-prep`**, which OPENS each offer
-   in the user's logged-in debug Chrome and STOPS before Aplicar (or before any screening questions,
-   which it surfaces as **ASK_USER**).
-3. Apply opens are **SERIALIZED** with the other CDP nodes — never concurrent. The user reviews each
-   open offer and clicks Aplicar themselves.
-4. After the user confirms an apply, flip the tracker row to Applied (never before). One app per
-   company.
+2. The orchestrator (`/job-network`) runs **`engines/computrabajo-apply.mjs`** over the software-keyword
+   search URLs with THIS user's preferences (asked → RAG, see USER PREFERENCES).
+3. The apply engine is CDP → **SERIALIZED** with the other CDP nodes — never concurrent.
+4. Each `APPLIED` row → tracker = Applied (the engine sent it). `NEEDS_ANSWERS` → resolve from the RAG,
+   re-run.
 
 ## Cross-references (do not duplicate here)
 - Candidate facts, skills+YOE, EEO, standard answers, comp floor / on-site-city policy → **NotebookLM
@@ -135,4 +168,4 @@ most postings fail here, so filter aggressively before spending any apply effort
 - Hard rules, per-offer workflow, network architecture, CDP reliability → **`docs/operating-rules.md`**
   / **`gary-job-search`**.
 - Two-way-fit gate + standing goal → **`docs/operating-rules.md`**.
-- One-click-apply sibling pattern (no fields, the user's click) → **`getonbrd-offers`**.
+- Answer engine for the questionnaire → **`easyapply-autofill`** / `engines/apply-fields.mjs`.

@@ -12,13 +12,16 @@
 // Usage: node engines/getonbrd-matches.mjs [--min 2500] [--days 7] [--max-loads 60] [--no-desc]
 import { chromium } from 'playwright';
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { acquireSiteLock } from './_site-lock.mjs';
+import { breathe, machinePace } from './_machine-guard.mjs';
+await acquireSiteLock('getonbrd.com');   // ONE bot per site + machine budget (anti-block, anti-freeze) — see _site-lock.mjs
 
 const CDP = process.env.CDP_URL || 'http://127.0.0.1:9333';
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const MIN = arg('--min', '2500'), DAYS = parseInt(arg('--days', '7'), 10), MAX_LOADS = parseInt(arg('--max-loads', '5'), 10);
 const NO_DESC = argv.includes('--no-desc');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = async (ms) => { await new Promise((r) => setTimeout(r, ms * machinePace())); await breathe(); };   // + machine back-off
 const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
 const now = new Date(); const cutoff = new Date(now.getTime() - DAYS * 864e5);
 const parseCardDate = (s) => { const m = (s || '').match(/([A-Z][a-z]{2})\s+(\d{1,2})/); if (!m) return null; const mo = MONTHS[m[1].toLowerCase()]; if (mo == null) return null; let y = now.getFullYear(); const d = new Date(y, mo, +m[2]); if (d > now) d.setFullYear(y - 1); return d; };
@@ -135,10 +138,11 @@ if (!NO_DESC) {
     } catch (e) { job.description = `ERROR: ${e.message.split('\n')[0]}`; job.eligible = false; }
     await jp.close().catch(() => {});
   };
-  for (let i = 0; i < jobs.length; i += 2) {
-    await Promise.all(jobs.slice(i, i + 2).map(extract));
-    console.log(`  JD ${Math.min(i + 2, jobs.length)}/${jobs.length}`);
-    if (i + 2 < jobs.length) await sleep(2000);
+  // ONE JD page at a time (one tab per site), jittered 4–9 s between opens — anti-block rule.
+  for (let i = 0; i < jobs.length; i++) {
+    await extract(jobs[i]);
+    console.log(`  JD ${i + 1}/${jobs.length}`);
+    if (i + 1 < jobs.length) await sleep(4000 + Math.random() * 5000);
   }
 }
 

@@ -7,6 +7,9 @@ metadata:
 
 # GetOnBoard source node (GARY)
 
+> **Before changing anything for this channel** (engine, selectors, verification, defaults): follow the `connections` skill §1 change protocol — baseline + re-run `node engines/check-connections.mjs`, change only this site's own rule, keep defaults, log the incident. Verification rule for this site lives ONLY in `engines/connections.mjs`.
+
+
 > **GARY banner.** Candidate-agnostic. Canonical rules: `docs/operating-rules.md`; per-board runbook:
 > `docs/career-ops-map.md §4.3`. Candidate facts (comp floor / city / country / language / eligible
 > geos) are DATA in `config/profile.yml`; skills, YOE and gaps come from the **NotebookLM RAG**. The

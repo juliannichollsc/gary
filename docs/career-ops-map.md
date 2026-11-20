@@ -124,6 +124,9 @@ exact steps; this section is the cross-board index.**
 | Himalayas | `source-himalayas` | §4.4 |
 | Computrabajo | `computrabajo-offers` | §4.5 |
 | Indeed | `indeed-offers` | §4.6 |
+| Dice / Hireline / Glassdoor | `source-boards` (`engines/board-sweep.mjs`) | `source-boards` skill |
+| Dover | `source-boards` (`engines/dover-jobs.mjs`, map only) | `source-boards` skill |
+| Web — company career pages | `source-web` (in-session LM search, no bots, map only) | `source-web` skill |
 | Tecla / VanHack / XpertDirect | `tecla-offers` · `vanhack-offers` · `xpertdirect-offers` | §4.7 |
 | A new board | `website-analyzer` | §4.8 |
 
@@ -131,12 +134,14 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
 + `data/offers-master.md`. Pending-offer inbox: `data/pipeline.md`.
 
 ### Concurrency model (critical)
-- **CDP channels run SERIAL** on the one debug Chrome: LinkedIn EasyApply, GetOnBoard, Himalayas,
+- **CDP channels run SERIAL** on the one debug Chrome: LinkedIn EasyApply, GetOnBoard, Himalayas, session boards (`board-sweep.mjs`),
   xpertdirect, tecla, vanhack, Computrabajo apply. One tab at a time — **3 LinkedIn tabs → 429**.
-- **WebFetch/API channels PARALLELIZE**: Gmail-LinkedIn triage, GetOnBoard public API, Himalayas
-  WebFetch, Indeed, Computrabajo sourcing. Real parallelism is **across sources**, not multiple tabs
-  of the same site.
-- **Himalayas WebFetch: MAX 2 concurrent** (see §4.4).
+- **WebFetch/API channels PARALLELIZE** across SOURCES: Gmail-LinkedIn triage, GetOnBoard public API, Himalayas
+  WebFetch, Indeed, Computrabajo sourcing. Real parallelism is **across sources**, never multiple tabs, bots or
+  in-flight requests on the same site.
+- **ONE bot / ONE tab / ONE request per site** (global rule, CLAUDE.md): browser engines lock their domain
+  (`engines/_site-lock.mjs` → `output/locks/`); HTTP providers keep one request in flight per host
+  (`providers/_http.mjs`, 0.3–0.7 s jitter, 423/429 breaker).
 
 ### 4.1 LinkedIn EasyApply — the only truly auto-fillable node
 - **ONE engine, offer-by-offer:** `engines/linkedin-scan.mjs` (drives logged-in Chrome:9333, never
@@ -150,7 +155,7 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
   keyword pre-filter** (auto-discards junior/intern, WordPress, .NET/C#, Java, Go/Rust/PHP/
   Salesforce/SAP, W2/US-only/work-auth, 10+ yrs — conservative, ambiguous SURVIVES; a JD that failed
   to load is NOT rejected, it's left unseen for next run) → next card.
-- **URL filters:** Easy Apply `f_AL=true`, `f_TPR=r604800|r86400`, `sortBy=DD`, and **work-type `f_WT` from the
+- **Filters = HUMAN-LIKE (2026-11 conversational LinkedIn, owner order: don't let LinkedIn detect the bot/AI):** typed title + zone, only the Past week tag, modality read from the card text, EVERY offer mapped with an Easy Apply FLAG (`apply: auto` = auto-apply, `apply: manual` = the user applies by hand), "Page N" buttons, shuffled combo order — `source-linkedin` §3. **Legacy fallback only (classic layout) — URL filters:** Easy Apply `f_AL=true`, `f_TPR=r604800|r86400`, `sortBy=DD`, and **work-type `f_WT` from the
   candidate's MODALITY** (`easyapply-filter.json` `workType` — `1`=on-site/presencial · `2`=remote · `3`=hybrid,
   comma list; default `2`). **If presencial/hybrid-only, `locations` = the candidate's current CITY, not the remote
   regions** (derived into `easyapply-filter.json` at session start — see `operating-rules §4`). Override per run:
@@ -212,13 +217,13 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
   (Google AND LinkedIn OAuth resist automation) → stay logged-in, open + hand off. "Ver postulación"
   on a card = already applied → skip.
 
-### 4.4 Himalayas — validate by WebFetch, MAX 2 bots, avoid 429/Cloudflare
+### 4.4 Himalayas — validate by WebFetch, ONE bot, avoid 429/Cloudflare
 - **Sourcing (CDP):** engine `engines/himalayas-matches.mjs`. Paginate `/jobs/matches?page=1..N` (read
   the max from the pagination control), map every match, then **navigate each job and scrape the full
   JD**.
 - **Validate each offer with WebFetch, exactly like Gmail** — read the real JD, don't trust the slug.
-- **RATE-LIMIT RULE (avoid Himalayas captcha / 429):** **at most 2 bots doing WebFetch to Himalayas at
-  once.** Anti-block: **≤2 concurrent, ~2s gap** between requests; the run is **resumable/incremental**
+- **RATE-LIMIT RULE (avoid Himalayas captcha / 429):** **ONE bot on Himalayas at a time** (global one-bot-
+  per-site rule). Anti-block: **1 page at a time, 4–9 s jitter** between JD opens; the run is **resumable/incremental**
   (save as you go). Exceeding this trips Himalayas' 429 / Cloudflare challenge.
 - **Cloudflare on detail pages:** a "Just a moment…" challenge **auto-clears ~4s in the real browser →
   poll until it clears before extracting** (a short fixed wait captures the challenge page instead of
@@ -228,7 +233,7 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
 - **Apply:** Himalayas links out to the company's ATS (Ashby/Greenhouse/Workable-style) → often
   auto-fillable → fill to Submit and STOP (§6).
 
-### 4.5 Computrabajo (Colombia / LATAM) — low-yield supplement, WebFetch source
+### 4.5 Computrabajo (Colombia / LATAM) — WebFetch source + FULLY AUTOMATIC apply (`engines/computrabajo-apply.mjs`)
 - **Sourcing (anonymous WebFetch, parallelizes):** query is in the URL PATH, not params.
   - Keyword: `https://co.computrabajo.com/empleos-de-{keyword}` (e.g. `/empleos-de-react`).
   - Keyword+place: `https://co.computrabajo.com/trabajo-de-{keyword}-en-{place}` (…`-en-medellin`,
@@ -242,22 +247,29 @@ Recurring screening-field answers: `data/easyapply-questions.md`. Company dedup:
 - **Triage is the HARSH filter:** comp floor in COP (convert; most CO dev posts are below floor →
   reject; blank ≠ below floor, confirm early), on-site only if it's the candidate's city, board skews
   .NET/Java/Python/SAP.
-- **Apply = internal one-click "Aplicar"/"Postularme" = the user's click** (logged-in, stays
-  on-platform). Some postings add a "preguntas de filtro" questionnaire → those are screening
-  questions → `ASK_USER`. Open + hand off.
+- **Apply = FULLY AUTOMATIC** (owner decision 2026-10-30; first exception to "never Submit" — the second is Dice in-platform apply, see `source-boards`):
+  `node engines/computrabajo-apply.mjs --roles … --min-salary … --modalidad … <search-url…>` walks the
+  listing, gates role + salary + modality, clicks Aplicar, answers the employer questionnaire
+  ("aspiración salarial" from the flags, the rest from the RAG) and sends "Enviar mi HdV". Unknown required
+  question → not sent (`NEEDS_ANSWERS`). **Only offers applied to on computrabajo.com** — external → skip.
+  **The flags are each user's preferences: ASK them (→ RAG), never assume.** Paced like LinkedIn (4–9 s/view,
+  30–60 s between applications, ≤10/run, block → no retry same day). Full map: `computrabajo-offers`.
 
-### 4.6 Indeed — discovery only, open-and-hand-off (NO auto-fill)
+### 4.6 Indeed — WebFetch sourcing + Indeed Apply auto-fill to REVIEW (`engines/indeed-apply.mjs`)
 - **Aggressively anti-bot.** Page 1 of a search IS anonymously readable via WebFetch; **pagination
-  (`start>=10`) hits a sign-in wall**; headless/CDP trips CAPTCHA + Cloudflare → **do NOT drive Indeed
-  over CDP.**
+  (`start>=10`) hits a sign-in wall**. Sourcing stays WebFetch; the ONLY CDP use is the paced apply
+  engine on the user's logged-in :9333 session (no scraping/paginating Indeed over CDP).
 - **Source page-1 only (WebFetch), get breadth by rotating `q=` and `l=`, not by paginating:**
   `https://co.indeed.com/jobs?q=<q>&l=Remote&fromage=7&sort=date` (and `www.indeed.com` for
   global/remote). Avoid `sc=0kf:attr(...)` facets (over-restrict → 0 results). Card links carry
   `jk=`; rebuild the clean URL `https://co.indeed.com/viewjob?jk=<jk>`; WebFetch it for survivors.
-- **Apply:** none are auto-fillable (Indeed Apply is login/captcha-gated; external-ATS redirects are
-  anti-bot gated). **Best move: re-route the role** — if the same posting exists on LinkedIn (Easy
-  Apply) or its ATS is anonymous (Ashby/Greenhouse/Workable), apply THERE. Otherwise `Start-Process`
-  the viewjob URL for the user to apply manually. Indeed feeds the auto-fill nodes; it doesn't fill.
+- **Apply — Indeed Apply ("Postúlate rápidamente") = AUTO-FILL to the review step** (mapped live
+  2026-10-30): `node engines/indeed-apply.mjs <jk…>` → CV selection → employer questions (fieldmap +
+  RAG; unknowns → `output/apply-pending-fields.json`, re-run resumes the draft) → **stops at review;
+  "Enviar tu postulación" is the user's click.** Captcha visible → stop, hand off. Paced like LinkedIn:
+  4–9 s/viewjob, 30–60 s between applications, ≤10/run, one tab; auto-stop on 429/captcha/sign-in wall
+  and no retry the same day (`output/indeed-block.json`). Selector map + honeypot traps: `indeed-offers`.
+- **External ("Postularse en el sitio de la empresa") = MANUAL** → never auto-applied or followed, but KEPT for the user (`MANUAL_EXTERNAL` → `output/indeed-manual.json` → offers map `apply: manual`).
 
 ### 4.7 Vetting-gated marketplaces — tecla · vanhack · xpertdirect (open-and-hand-off, 0% auto-fill)
 Common shape: managed talent marketplaces where the candidate is **selected into a shortlist** via
@@ -396,7 +408,7 @@ positive number.
 | `linkedin-scan.mjs` | the ONE EasyApply sourcer (offer-by-offer, dedup, survivors.json) |
 | `gmail-harvest.mjs` | mine the job-alert inbox over CDP → offer URLs |
 | `getonbrd-matches.mjs` | GetOnBoard `/myjobs` sourcer (early-stop + card pre-filter) |
-| `himalayas-matches.mjs` | Himalayas `/jobs/matches` sourcer (≤2 concurrent, Cloudflare poll) |
+| `himalayas-matches.mjs` | Himalayas `/jobs/matches` sourcer (serial, 4–9 s jitter, Cloudflare poll) |
 | `scan-boards.mjs` / `scrape-matches.mjs` | free-board / logged-in board scrapers |
 | `apply-from-linkedin.mjs` | single-offer fill → Submit (Easy Apply + external ATS) |
 | `easyapply-batch.mjs` | batch fill → Submit (skip-on-unknown) |
@@ -406,7 +418,7 @@ positive number.
 | `inspect-session-site.mjs` | classify a new board (website-analyzer) |
 | `learn-forms.mjs` / `read-fields.mjs` / `jd.mjs` / `linkedin-enrich.mjs` | form-map + JD helpers |
 | `check-liveness.mjs` (+ `liveness-browser.mjs`, `liveness-core.mjs`) | zero-token closed/expired verifier (Playwright; rule-9 authoritative check) |
-| `scan.mjs` + `providers/*.mjs` | zero-token free-board scan (Ashby/Greenhouse/Lever/Workable/Remotive/RemoteOK/Jobicy/TheMuse/…) → `data/pipeline.md` |
+| `scan.mjs` + `providers/*.mjs` + `ats-registry.mjs` | zero-token free-board scan + ~15k-board rotating ATS registry (Ashby/Greenhouse/Lever/Workable/Remotive/RemoteOK/Jobicy/TheMuse/WorkingNomads/Jobspresso/…) → `data/pipeline.md` |
 | `merge-tracker.mjs` · `verify-pipeline.mjs` · `normalize-statuses.mjs` · `dedup-tracker.mjs` · `analyze-patterns.mjs` | tracker pipeline over `data/applications.md` (add rows only via merge; states in `templates/states.yml`) |
 | `cv-builder.mjs` (HTML) · `build-cv-latex.mjs` + `generate-latex.mjs` (LaTeX) | CV generation paths |
 

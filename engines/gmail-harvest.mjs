@@ -18,6 +18,8 @@
 //   node engines/gmail-harvest.mjs --query 'from:linkedin newer_than:2d'   # full override
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { acquireSiteLock } from './_site-lock.mjs';
+await acquireSiteLock('google.com');   // ONE bot per site + machine budget (anti-block, anti-freeze) — see _site-lock.mjs
 
 // Harvest output dir — relative to CWD (= project root), NOT to this file. `linkedin-scan.mjs` hardcodes
 // the same 'output/gmail-harvest' (see its mkdirSync/--seen/--out) and reads our offers-<date>.json via

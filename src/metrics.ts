@@ -8,10 +8,11 @@
 import { invoke } from "@tauri-apps/api/core";
 
 // Fixed set of sources/websites (same order as data/metrics.md). "ATS" = jobs conseguidos por el scanner
-// zero-token de 16 providers (engines/scan.mjs), separado de las conexiones (WebFetch/CDP).
-export type Source = "LinkedIn" | "Gmail" | "Indeed" | "GetOnBoard" | "Himalayas" | "Computrabajo" | "ATS";
+// zero-token de 16 providers (engines/scan.mjs), separado de las conexiones (WebFetch/CDP). "Web" = ofertas
+// en páginas de empresa halladas por la búsqueda web del propio LM del usuario, EN la sesión (source-web).
+export type Source = "LinkedIn" | "Gmail" | "Indeed" | "GetOnBoard" | "Himalayas" | "Computrabajo" | "Dice" | "Hireline" | "Glassdoor" | "Dover" | "ATS" | "Web";
 
-export const SOURCES: Source[] = ["LinkedIn", "Gmail", "Indeed", "GetOnBoard", "Himalayas", "Computrabajo", "ATS"];
+export const SOURCES: Source[] = ["LinkedIn", "Gmail", "Indeed", "GetOnBoard", "Himalayas", "Computrabajo", "Dice", "Hireline", "Glassdoor", "Dover", "ATS", "Web"];
 
 // One hunt = one búsqueda/filtrado.
 export type Hunt = {
@@ -59,8 +60,15 @@ export const realBySource = (d: MetricsData): Record<Source, number> =>
   d.hunts.reduce((acc, h) => {
     for (const s of SOURCES) acc[s] += h.bySource[s] ?? 0;
     return acc;
-  }, bs([0, 0, 0, 0, 0, 0]));
+  }, bs([]));
 
 // Fuentes activas = nº de fuentes con >0 jobs reales acumulados.
 export const activeSources = (d: MetricsData): number =>
   SOURCES.filter((s) => realBySource(d)[s] > 0).length;
+
+// Actual vs anteriores: la consulta actual es la ÚLTIMA fila del log (data/metrics.md agrega al final);
+// las anteriores son todas las demás. Se muestran por separado para no mezclar la sesión en curso con el histórico.
+export const splitHunts = (d: MetricsData): { current: MetricsData; previous: MetricsData } => ({
+  current: { hunts: d.hunts.slice(-1) },
+  previous: { hunts: d.hunts.slice(0, -1) },
+});

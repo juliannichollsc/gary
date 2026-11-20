@@ -6,6 +6,8 @@ You are the **parallel meta-orchestrator** for the candidate's job search. Unlik
 
 Subagents cannot spawn subagents, so YOU (the main loop) own every Agent dispatch and every parallel batch. Spawn concurrent agents by putting multiple Agent tool calls in a single message.
 
+**MACHINE BUDGET (MANDATORY, CLAUDE.md):** before launching ANY engine run `node engines/_machine-guard.mjs` and never run more bots than `maxBots − running` (the Rendimiento level, capped by hardware + free RAM); every browser script — including your own one-off probes — must `await acquireSiteLock()` from `engines/_site-lock.mjs`. On any `⚠ GARY-MACHINE` / `⛔ GARY-MACHINE-OVERLOAD` line: tell the user at once and reduce on your own (no new engines, serialize, lower `--max-views`/`--max`, raise `--pace`) until it reports `ok`. Agents (triage/evaluate) are API-side and don't count, but the engines they trigger do.
+
 **Hard concurrency cap: 3 agents in flight at any moment.** Track how many are running; only launch a new one when a slot frees.
 
 Optional `$ARGUMENTS`: URL-list path, `harvest`, or `scan`. Default = harvest + scan + full streaming pipeline.

@@ -17,17 +17,19 @@
     LLM de búsqueda (solo engines + trabajo de repo), `tokens=0`. Solo se instrumenta lo medible; si el
     main-loop no está instrumentado y solo hizo trabajo de repo, no se imputa al hunt.
   - Sourcing recency: por defecto el hunt filtra ofertas de la última semana (ventana configurable).
-  - SOURCES (fixed set, one column each): LinkedIn · Gmail · Indeed · GetOnBoard · Himalayas · Computrabajo · ATS.
-    (`ATS` = jobs del scanner zero-token de 16 providers `engines/scan.mjs`, aparte de las conexiones WebFetch/CDP.)
+  - SOURCES (fixed set, one column each): LinkedIn · Gmail · Indeed · GetOnBoard · Himalayas · Computrabajo · Dice · Hireline · Glassdoor · Dover · ATS · Web.
+    (`ATS` = jobs del scanner zero-token de 18 providers `engines/scan.mjs`, aparte de las conexiones WebFetch/CDP.)
+    (`Web` = ofertas en las PÁGINAS DE LAS EMPRESAS halladas por la búsqueda web del propio LM del usuario, EN la
+    sesión — skill `source-web`, sin bots; sus tokens SÍ cuentan en `tokens` porque es trabajo LLM de búsqueda.)
     A source with 0 real jobs still lists 0 (keeps every row parseable with the same shape).
   - Invariants (parser may assume): sum of the per-source values == real; real <= total.
   - If a hunt is STOPPED early by the user, still APPEND its row with the ACTUAL totals reached, and put
     an HTML comment ABOVE the row noting "STOPPED — <what didn't run> — expected ~<projection>" (comments
     don't break the parser; the projection detail lives in data/offers-master.md).
   - Row format (single line, ` — ` separated; per-source is `Fuente:N` comma-joined, fixed order):
-      - {YYYY-MM-DDThh:mm} — {model} — tokens={T} — total={N} — real={M} — LinkedIn:a, Gmail:b, Indeed:c, GetOnBoard:d, Himalayas:e, Computrabajo:f, ATS:g
+      - {YYYY-MM-DDThh:mm} — {model} — tokens={T} — total={N} — real={M} — LinkedIn:a, Gmail:b, Indeed:c, GetOnBoard:d, Himalayas:e, Computrabajo:f, Dice:h, Hireline:i, Glassdoor:j, Dover:k, ATS:g, Web:w
     Ejemplo (NO lo dejes aquí; solo referencia de formato):
-      - 2026-07-04T14:20 — claude-opus-4-8 — tokens=48210 — total=128 — real=41 — LinkedIn:18, Gmail:9, Indeed:1, GetOnBoard:7, Himalayas:5, Computrabajo:1, ATS:0
+      - 2026-07-04T14:20 — claude-opus-4-8 — tokens=48210 — total=128 — real=41 — LinkedIn:18, Gmail:9, Indeed:1, GetOnBoard:7, Himalayas:5, Computrabajo:1, Dice:0, Hireline:0, Glassdoor:0, Dover:0, ATS:0, Web:0
   - A Rust command `read_metrics` (spec 07) parses "## Hunts" into `MetricsData`. Until it exists, the UI
     falls back to an EMPTY state (arranca de 0).
 -->

@@ -20,6 +20,7 @@ const SKILLS = [
   'getonbrd-offers', 'computrabajo-offers', 'indeed-offers',
   'tecla-offers', 'vanhack-offers', 'xpertdirect-offers',
   'chrome-autoapply', 'easyapply-autofill', 'website-analyzer',
+  'source-boards', 'source-web', 'connections',
 ];
 
 // Dirs to skip anywhere in a recursive copy (PII / runtime caches). Se comparan por SEGMENTO de ruta,

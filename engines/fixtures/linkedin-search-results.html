@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Jobs | LinkedIn (GARY offline fixture)</title>
+<!-- OFFLINE FIXTURE of LinkedIn's 2026-11 conversational jobs search (mapped from the live DOM + the owner's
+     screenshot). Used by `GARY_LI_HOME=file://…/engines/fixtures/linkedin-search-results.html node engines/linkedin-scan.mjs`
+     to regression-test the human-like mapping (role box → region control → Date posted pill → cards → Page N)
+     WITHOUT touching the user's account. Keep it in sync when LinkedIn's UI changes (connections skill §1). -->
+<style>body{font:14px sans-serif;width:1400px}.pop{display:none;border:1px solid #999;padding:8px;position:absolute;background:#fff}.open{display:block}
+.card{border-bottom:1px solid #ddd;padding:8px;cursor:pointer;width:500px}#jd{position:absolute;left:620px;top:200px;width:600px}</style></head><body>
+<main>
+<input data-testid="typeahead-input" componentkey="semanticSearchBox" placeholder="Describe the job you want" style="width:400px" value="Full Stack Developer Colombia">
+<nav style="margin:10px 0">
+  <div role="button" aria-label="Filter by Date posted" id="dp" style="display:inline-block;border:1px solid #333;padding:4px 10px">Date posted</div><input type="checkbox" id="dpOn" style="display:none">
+  <div class="pop" id="dpPop"><label><input type="radio" name="d" aria-label="Past month">Past month</label><br>
+    <label><input type="radio" name="d" aria-label="Past week">Past week</label><br>
+    <label><input type="radio" name="d" aria-label="Past 24 hours">Past 24 hours</label><br><button id="dpReset">Reset</button> <a href="#" id="dpShow">Show results</a></div>
+</nav>
+<div id="hdr"><span id="count">99+ results</span> <div role="button" aria-expanded="false" id="loc" style="display:inline-block">Colombia</div> <a href="#">How promoted jobs are ranked</a> · <a href="#">How AI search works</a></div>
+<div class="pop" id="locPop"><input id="locIn" value="Colombia"><button aria-label="Clear location" id="locClear">×</button><div id="locList"><a href="#">Colombia</a><br><a href="#">Medellín, Antioquia, Colombia</a></div></div>
+<div id="cards"></div><div id="jd"></div>
+<div id="pager"><button aria-label="Page 1">1</button><button aria-label="Page 2">2</button></div>
+</main>
+<script>
+const Q = document.querySelector('[data-testid=typeahead-input]');
+const state = { q: Q.value, loc: 'Colombia', date: '', page: 1 };
+const AGES = { '': ['2 days ago', '1 month ago', '3 weeks ago', '5 days ago'], 'Past week': ['2 days ago', '1 day ago', '5 days ago', '3 days ago'] };
+function render() {
+  document.getElementById('count').textContent = (state.date ? 24 : 99) + (state.date ? '' : '+') + ' results';
+  document.getElementById('loc').textContent = state.loc;
+  const ages = AGES[state.date] || AGES[''];
+  document.getElementById('cards').innerHTML = [0, 1, 2, 3].map((i) => {
+    const id = String(4480000000 + state.page * 10 + i);
+    return `<div class="card" componentkey="job-card-component-ref-${id}">${state.q} ${i}\nAcme ${i}\n${state.loc} (${i === 2 ? 'On-site' : 'Remote'})\n${ages[i]}${i % 2 ? '' : ' · Easy Apply'}</div>`;
+  }).join('');
+  window.__gary = { ...state };
+}
+Q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { state.q = Q.value; state.page = 1; history.pushState({}, '', location.pathname + '?search-results=1'); render(); } });
+// live: the input keeps the current place (NOT focused) + a "Clear location" button; suggestions are <a> links
+const bindOpts = () => document.querySelectorAll('#locList a').forEach((a) => a.onclick = (e) => { e.preventDefault(); state.loc = a.textContent; document.getElementById('locPop').classList.remove('open'); document.getElementById('loc').setAttribute('aria-expanded', 'false'); render(); });
+document.getElementById('loc').onclick = () => { document.getElementById('locPop').classList.add('open'); document.getElementById('loc').setAttribute('aria-expanded', 'true'); document.getElementById('locIn').value = state.loc; bindOpts(); };
+document.getElementById('locClear').onclick = () => { const i = document.getElementById('locIn'); i.value = ''; i.focus(); };
+document.getElementById('locIn').oninput = (e) => {
+  const v = e.target.value; const opts = ['Colombia', 'Latin America', 'Worldwide', 'Medellín, Antioquia, Colombia'].filter((o) => o.toLowerCase().startsWith(v.toLowerCase()));
+  document.getElementById('locList').innerHTML = opts.map((o) => `<a href="#">${o}</a>`).join('<br>');
+  bindOpts();
+};
+document.getElementById('dp').onclick = () => document.getElementById('dpPop').classList.add('open');
+document.getElementById('dpShow').onclick = (e) => {
+  e.preventDefault();
+  const r = document.querySelector('#dpPop input:checked'); state.date = r ? r.getAttribute('aria-label') : '';
+  const dpEl = document.getElementById('dp'); dpEl.textContent = state.date || 'Date posted'; dpEl.setAttribute('aria-label', 'Filter by ' + (state.date || 'Date posted')); document.getElementById('dpOn').checked = !!state.date;
+  document.getElementById('dpPop').classList.remove('open'); render();
+};
+document.getElementById('cards').onclick = (e) => {
+  const c = e.target.closest('.card'); if (!c) return; const id = c.getAttribute('componentkey').split('-').pop();
+  history.pushState({}, '', location.pathname + '?currentJobId=' + id);
+  document.getElementById('jd').innerHTML = `<div data-testid="expandable-text-box">About the job. We build React and Node.js TypeScript products for remote teams across Latin America, ${c.innerText.split('\n').pop()}. Requirements: React, Node.js, TypeScript.</div>`;
+  document.title = `${c.innerText.split('\n')[0]} | Acme | LinkedIn`;
+};
+document.getElementById('pager').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; state.page = +b.textContent; render(); };
+render();
+</script></body></html>

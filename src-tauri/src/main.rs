@@ -109,6 +109,22 @@ fn import_login_shell_path() {
     }
 }
 
+// Linux: a terminal inside the VS Code *snap* leaks the snap's GTK/GIO env (GSETTINGS_SCHEMA_DIR,
+// GTK_PATH, XDG_DATA_DIRS, …) into child processes. WebKitGTK then loads the snap's stale GSettings
+// schemas and aborts at startup ("Settings schema 'org.gnome.settings-daemon.plugins.xsettings' does
+// not contain a key named 'antialiasing'"). The snap saves every original value as `<VAR>_VSCODE_SNAP_ORIG`
+// (empty = was unset), so restore those before GTK initializes. No-op outside that terminal.
+#[cfg(target_os = "linux")]
+fn restore_vscode_snap_env() {
+    const SUFFIX: &str = "_VSCODE_SNAP_ORIG";
+    let saved: Vec<(String, String)> = std::env::vars()
+        .filter_map(|(k, v)| k.strip_suffix(SUFFIX).map(|base| (base.to_string(), v)))
+        .collect();
+    for (var, orig) in saved {
+        if orig.is_empty() { std::env::remove_var(&var); } else { std::env::set_var(&var, orig); }
+    }
+}
+
 // Spawn a concrete CLI (e.g. "gemini", "claude", "opencode") in a PTY rooted at `cwd`. Kept for
 // explicit launches; the boot path uses `open_terminal` instead so no LLM is preloaded.
 #[tauri::command]
@@ -137,6 +153,8 @@ fn resize_pty(state: State<PtyState>, rows: u16, cols: u16) -> Result<(), String
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    restore_vscode_snap_env();
     #[cfg(unix)]
     import_login_shell_path();
 
@@ -147,6 +165,8 @@ fn main() {
         .setup(|app| {
             // Installed app: materialize GARY's context into a writable workspace (no-op in dev).
             workspace::bootstrap(app);
+            // Engines read the Rendimiento level from the workspace (machine budget) — export it at launch.
+            if let Ok(s) = get_settings(app.handle().clone()) { settings::export_runtime(&s); }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

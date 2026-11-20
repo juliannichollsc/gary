@@ -11,6 +11,7 @@ You are the **director of the candidate's application network** ("red de aplicac
 | `source-linkedin` | LinkedIn | logged-in (CDP) | Easy Apply / external ATS | YES (stop before Submit) |
 | `source-getonbrd` | GetOnBoard | logged-in (CDP) | one-click "Postular" | NO fields → open, the user's click |
 | `source-himalayas` | Himalayas | logged-in (CDP) + public API | external company ATS | YES (external) |
+| `source-web` | company career pages (open web) | the user's LM, WebSearch + WebFetch — **in THIS session, never a background agent** | the company's own page | NO → map only, the user applies |
 | `website-analyzer` | any NEW site | scout | classifies + recommends | — |
 
 Function agents (shared): `job-triage`, `job-evaluator`, `job-apply-prep`.
@@ -19,6 +20,8 @@ Function agents (shared): `job-triage`, `job-evaluator`, `job-apply-prep`.
 All CDP work goes through the ONE dedicated debug Chrome defined in `config/profile.yml` → `job_search.automation_browser` (default port `:9333`; port and profile are DATA — read them from config). The user's personal browser is OFF-LIMITS. **CDP-dependent nodes (gmail/linkedin/getonbrd/himalayas) must run ONE AT A TIME** — never fan them out concurrently (the ws is fragile; concurrency breaks it). Parallelize only the parts that DON'T touch CDP: triage/enrich (WebFetch) and public-API pulls. Before driving it, poll `http://127.0.0.1:<port>/json/version` for `webSocketDebuggerUrl`; don't relaunch the debug Chrome if a session is already up. If CDP is down, chain `relaunch + script` in ONE command.
 
 ## Flow (every invocation)
+**MACHINE BUDGET (MANDATORY, CLAUDE.md):** before launching ANY engine run `node engines/_machine-guard.mjs` and never run more bots than `maxBots − running` (the Rendimiento level, capped by hardware + free RAM); every browser script — including your own one-off probes — must `await acquireSiteLock()` from `engines/_site-lock.mjs`. On any `⚠ GARY-MACHINE` / `⛔ GARY-MACHINE-OVERLOAD` line: tell the user at once and reduce on your own (no new engines, serialize, lower `--max-views`/`--max`, raise `--pace`) until it reports `ok`. Agents (triage/evaluate) are API-side and don't count, but the engines they trigger do.
+
 1. **Source sweep (CDP nodes serial, API nodes parallel):** dispatch each source agent to return its fresh offer URLs. Apply the **≤1-week posting** filter. Mark `application_confirmation` job-ids as already-Applied.
 2. **Triage (parallel, WebFetch — safe to fan out ≤3):** route each platform's URLs to `job-triage` (or the source agent's own triage). Filter eligibility / comp / YOE / hard-req / company-dedup vs `data/applications.md` / liveness. Prioritize Easy Apply + external-ATS (auto-fillable) over one-click/manual.
 3. **Evaluate (parallel ≤3):** for survivors ≥4.0 that pass the two-way-fit gate, `job-evaluator` writes report + tailors CV + stages tracker TSV (orchestrator pre-assigns report/tracker numbers).

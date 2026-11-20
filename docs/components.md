@@ -22,30 +22,35 @@
 | **Avatar** | `paw` (GARY) · `user` · `site` | `kind, src, size` | paw = crafted SVG brand mark, not emoji |
 | **StatusDot** | `success/warning/danger/info` | `status, pulse` | pulse for "verificando"; paired with label always |
 | **Skeleton** | line · block · row | `width, height` | shimmer for >300ms loads |
+| **Kbd** | — | children | keyboard hint chip (`.kbd`): Ctrl K, /, j/k, Esc |
 
 ## B. Chat (main view) — `chat.pen`
 
 | Component | Description | Props / states |
 |-----------|-------------|----------------|
-| **ChatLayout** | Header (title + model badge) · scrollable message list · composer. Underneath = embedded xterm terminal, skinned as chat. | — |
+| **ChatLayout** | Header (title + ChatStatusBar) · embedded xterm terminal (**output-only**, skinned from tokens) · Composer. ONE input surface: keystrokes/paste on the terminal are blocked (`attachCustomKeyEventHandler` → false; NOT `disableStdin`, which would also drop xterm's automatic replies to CLI queries); click on the terminal focuses the composer; Ctrl+C copies a terminal selection. | — |
 | **ChatMessage** | Bubble; `user` (right, surface-2) vs `gary` (left, with paw avatar). Renders markdown, **code blocks**, **tables**. | `author, content, timestamp, streaming` |
 | **CodeBlock** | Mono, `--surface-3`, header with language + copy button. | `lang, code, onCopy` |
 | **DataTable (in-message)** | Compact table for offers/results inside chat. | `columns, rows` |
-| **StreamingIndicator** | 3-dot amber bounce + "GARY está escribiendo…". | loops; `aria-live=polite` |
-| **Composer** | Multiline input (`--surface-2`), send button (accent), Enter=send / Shift+Enter=newline, char/stop affordance during stream. | `value, onSend, onStop, streaming, disabled` |
+| **StreamingIndicator** | Replaces the suggestions row while the agent works: 3-dot amber bounce + "Claude está pensando…" (agent name detected; "Ejecutando…" in the bare shell) + **Detener** (Esc → agent, Ctrl+C → shell). Heuristic: on after a send / forwarded Enter, off after ~1.4 s without PTY output (CLIs animate their spinner while working; they go quiet when done or when asking for permission). | loops; `aria-live=polite` |
+| **Composer** | Auto-growing textarea (1–6 lines), send (accent, disabled when empty), hint line. Enter = send (text and `\r` in separate writes; multi-line via bracketed paste), Shift+Enter = newline. With the box **empty**, ↑ ↓ ← → / Enter / Esc / Ctrl+C (and Tab / Shift+Tab once an agent is running) go to the terminal — so the agent's permission menus are answerable without typing in the terminal. | `value, onSend, onStop, busy` |
 | **QuickActions** | Row of suggestion chips above composer ("Buscar ofertas", "Revisa Gmail", "Continuar hunt", "Mapa de ofertas"). | `actions[]` |
+| **ChatStatusBar** | Pills in the chat header: terminal session (activa / terminada → **Reiniciar**), agent detected from the typed line (`claude`/`gemini`/`opencode`/`codex`, informational only), automation browser `:port` (detenido → **Iniciar**), running engines (from `engine://data`/`engine://exit`). | `session, agent, browser, engines` |
 
 ## C. Sidebar — `sidebar.pen`
 
 | Component | Description | Props / states |
 |-----------|-------------|----------------|
 | **Sidebar** | 260px panel; collapsible to 64px icon-rail. | `collapsed` |
-| **BrandHeader** | Paw mark + "GARY" wordmark + tagline. Paw wags on hover. | — |
-| **NavItem** | Icon + label; active = accent pill (Flip morph) + left bar. Items: **Chat · Mapa de ofertas · Onboarding · Métricas · Ajustes**. `Métricas` lives directly below `Onboarding` in the sidebar. | `icon, label, active, badge?` |
-| **ConnectionsSection** | Header "Conexiones" + list of mapped sites. | — |
+| **BrandHeader** | Removed from the sidebar — the brand lives in the Titlebar (isotipo + wordmark); repeating it cost a whole row. | — |
+| **PaletteTrigger** | "Buscar o ejecutar… Ctrl K" button at the top of the sidebar; opens the CommandPalette. | `onOpen` |
+| **SidebarDock** (`App.tsx`) | Gate + motion: the sidebar exists ONLY once onboarding is complete (or during the tutorial). Hide/show from the Titlebar toggle, the palette or **Ctrl+B** (ignored inside the terminal); slides left (width → 0 + content −16px/fade, 280ms), stays mounted but `inert` while hidden; preference persisted. | `open, animateIn` |
+| **TitlebarActions** | Sidebar toggle (left of the brand, only when the sidebar exists) + **Ayuda** (the single global entry to the tutorial, replacing the per-view button). | — |
+| **NavItem** | Icon + label; active = ONE shared sliding accent pill (GSAP) + left bar. Items: **Chat · Mapa de ofertas · Perfil · Métricas · Ajustes** ("Perfil" = the onboarding view; first-run header reads "Configuración inicial", returning users get "Tu perfil" to edit what they entered). Collapsed icon-rail shows a CSS tooltip (`data-tip`). `Métricas` lives directly below `Onboarding` in the sidebar. | `icon, label, active, badge?` |
+| **ConnectionsSection** | Collapsed by default to ONE line: "Conexiones" + a dot per site (filled = connected, amber = pending) + Verificar; expands to the compact site list. Browser-down state lives in the Chat status bar. | `open` (persisted) |
 | **ConnectionItem** | Site favicon/name + **StatusPill** (conectado ✓ / desconectado ✗ / verificando) + **"Conectar"** button (opens automation browser). Sites: Gmail · LinkedIn · Indeed · GetOnBoard · Himalayas · Computrabajo. | `site, status, onConnect` |
 | **ThemeToggle** | Dark/Light switch with sun/moon, bottom of sidebar. | `theme, onToggle` |
-| **UserFooter** | User avatar + name + settings shortcut. | — |
+| **UserFooter** | Removed: GARY is single-user and candidate-agnostic, a generic "Tú" row added noise. Footer = ThemeToggle only. | — |
 
 ## D. Ajustes (Settings) — `settings.pen`
 
@@ -85,11 +90,13 @@ Renders `data/offers-master.md`.
 | Component | Description | Props / states |
 |-----------|-------------|----------------|
 | **OffersLayout** | Toolbar (filters + search) · per-channel grouped table · summary. | — |
-| **FilterBar** | Channel chips (Gmail/LinkedIn/Indeed/GetOnBoard/Himalayas/Computrabajo), status filter ([ ]/[x]/[~]), score-min slider, search. | `filters, onChange` |
+| **FilterBar** | One row: search (`/`) · **FilterMenu** "Canal ▾" · **FilterMenu** "Estado ▾" · score-min slider · summary. | `filters, onChange` |
+| **FilterMenu** | Compact multi-select popover (menuitemcheckbox) with active-count badge + "Limpiar filtros"; replaces rows of toggle chips. | `label, options, selected, onToggle, onClear` |
 | **ChannelGroup** | Collapsible section per channel with count + summary row. | `channel, count` |
-| **OfferRow** | Company · role · channel · **ScoreMeter** (0–5) · **StatusBox** ([ ] pendiente / [x] aplicada / [~] flag) · comp/location meta · **"Preparar aplicación"** action. | `offer, onPrepare` |
+| **OfferRow** | Company · role · comp/location meta · **ScoreMeter** (0–5, dots fill in on mount) · **StatusBox** · **"Preparar aplicación"** (revealed on hover/selection/focus; always in the drawer). No channel column — rows are grouped by channel. Density: cómoda (multi-line) / compacta (one line), persisted. | `offer, onPrepare` |
+| **OfferDrawer** | Right-side detail panel (table stays visible): company/role, score + status + channel, role summary + "Ver oferta", tailored CV (ver / regenerar), sticky footer with the Submit-guard + "Preparar aplicación". Keyboard: j/k move, Enter open/close, Esc close, "/" search. | `offer, onClose, onPrepare, onRegenerate` |
 | **ScoreMeter** | 5 dots + number, perceptual color; ≥4.0 gets accent ring. | `score` (0–5) |
-| **StatusBox** | Checkbox-style tri-state with icon + label + color. | `status` |
+| **StatusBox** | Tri-state: colored mono glyph (`[ ]` / `[x]` / `[~]`) + label. No extra dot (glyph + label already carry it). | `status` |
 | **OffersSummary** | Per-channel counts + totals header. | `summary` |
 
 ## F2. Métricas — `metrics.pen`
@@ -123,7 +130,8 @@ Renders `data/offers-master.md`.
 | **LoadingState** | Skeletons (lists/cards) or centered paw loader for full-screen. | `kind` |
 | **ErrorState** | Danger icon + cause + **recovery action** (retry/help) — never a dead end. | `message, onRetry` |
 | **OfflineState** | "Sin conexión" banner + degraded-mode note (automation browser/CDP down). | `onRetry` |
-| **Toast** | Success/warning/danger/info; slide-up, auto-dismiss 3–5s, `aria-live`. | `type, message` |
+| **Toast** | Success/warning/danger/info; slide-up, auto-dismiss (4–7s, pauses on hover/focus), max 3, `aria-live`; `useToast().show()` from `src/toast.tsx`. | `type, message, action?` |
+| **CommandPalette** | Ctrl/Cmd+K (capture phase, works over the terminal): go to a view, app actions (theme, start browser, tutorial), prefill a Chat task (never auto-sent), open an offer. ARIA combobox + listbox. | `open, onClose, commands[]` |
 
 ---
 
@@ -132,14 +140,14 @@ Renders `data/offers-master.md`.
 | Screen (`.pen`) | Primary components |
 |-----------------|--------------------|
 | `chat` | ChatLayout, ChatMessage, CodeBlock, StreamingIndicator, Composer, QuickActions, Sidebar |
-| `sidebar` | Sidebar, BrandHeader, NavItem, ConnectionsSection, ConnectionItem, StatusPill, ThemeToggle |
+| `sidebar` | SidebarDock, PaletteTrigger, NavItem, ConnectionsSection, ConnectionItem, ThemeToggle (+ TitlebarActions) |
 | `settings` | ChatRuntimeSummary, TokenUsageSummary, ApiKeyField, BrowserControl, SettingsRow, SaveBar |
 | `onboarding` | OnboardingStepper, CvUpload, NotebookLMLoginBanner, IngestProgress, RoleMap, OnboardingHero, StepNav |
 | `intro` | IntroSplash, IntroCaption |
 | `offers-map` | FilterBar, ChannelGroup, OfferRow, ScoreMeter, StatusBox, OffersSummary |
 | `metrics` | MetricsOverview, JobsBySourceChart, QueryHistoryPanel |
 | `apply-modal` | ApplyModal, SubmitGuardBanner, CvAttachment, DraftAnswers, ApplyActions |
-| `states` | EmptyState, LoadingState, ErrorState, OfflineState, Toast |
+| `states` | EmptyState, LoadingState (SkeletonRows), ErrorState, Toast, CommandPalette — `src/components/states.tsx`, `src/toast.tsx`, `src/components/CommandPalette.tsx` |
 
 > Build order suggestion (later phase): primitives (A) → Sidebar+Chat shell (C, B) → Settings (D) →
 > Offers map (F) → Onboarding (E) → Apply modal (G) → polish global states + GSAP motion (H, §5).

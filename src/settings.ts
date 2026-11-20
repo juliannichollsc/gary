@@ -14,16 +14,17 @@ export const BROWSERS: { id: BrowserId; label: string; tested?: boolean }[] = [
   { id: "chromium", label: "Chromium" },
 ];
 
-// Rendimiento = límite de la MÁQUINA: cuántas ventanas/automatizaciones/bots simultáneos corre el LM para
-// NO saturar el computador (según su capacidad). Es APARTE de las reglas 429 por-website (mandatorias,
-// protegen cuenta/IP). `parallel` = operaciones concurrentes máximas. El agente LM lo lee para orquestar.
+// Rendimiento = límite de la MÁQUINA: cuántos bots simultáneos corren para NO saturar el computador. Es APARTE
+// de las reglas 429 por-website (protegen cuenta/IP). Rust lo exporta a output/gary-settings.json y CADA engine
+// lo obedece vía engines/_machine-guard.mjs (= min(nivel, hardware, RAM libre ahora) + back-off si el equipo se
+// carga). `parallel` DEBE coincidir con LEVEL_BOTS de ese archivo.
 export type PerfLevel = "very_low" | "low" | "medium" | "high" | "very_high";
 export const PERF_LEVELS: { id: PerfLevel; parallel: number; gapMs: number }[] = [
   { id: "very_low",  parallel: 1, gapMs: 3000 },
-  { id: "low",       parallel: 2, gapMs: 2000 },
-  { id: "medium",    parallel: 3, gapMs: 1500 },
-  { id: "high",      parallel: 4, gapMs: 1000 },
-  { id: "very_high", parallel: 6, gapMs: 700 },
+  { id: "low",       parallel: 1, gapMs: 2000 },
+  { id: "medium",    parallel: 2, gapMs: 1500 },
+  { id: "high",      parallel: 3, gapMs: 1000 },
+  { id: "very_high", parallel: 4, gapMs: 700 },
 ];
 
 export type Settings = {

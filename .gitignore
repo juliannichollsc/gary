@@ -39,6 +39,9 @@ build-agents/
 !.claude/skills/source-linkedin
 !.claude/skills/source-getonbrd
 !.claude/skills/source-himalayas
+!.claude/skills/source-web
+!.claude/skills/source-boards
+!.claude/skills/connections
 !.claude/skills/getonbrd-offers
 !.claude/skills/computrabajo-offers
 !.claude/skills/indeed-offers
